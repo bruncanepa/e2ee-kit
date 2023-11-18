@@ -1,0 +1,26 @@
+{
+  "name": "open-e2ee",
+  "version": "1.0.0",
+  "description": "Open tools to make E2EE easier for any Web app",
+  "main": "index.ts",
+  "scripts": {
+  },
+  "author": "Bruno Cánepa",
+  "license": "MIT",
+  "keywords": [
+    "crypto",
+    "pgp",
+    "gpg",
+    "openpgp",
+    "e2ee",
+    "aes",
+    "aes-256"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bruncanepa/open-e2ee"
+  },
+  "dependencies": {
+    "openpgp": "^5.11.0"
+  }
+}
