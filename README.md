@@ -22,6 +22,8 @@ Visit [this](https://github.com/users/bruncanepa/projects/2/views/1) GitHub proj
    3. Encrypt key from step 2.1, with your PGP private key.
 3. Save both encrypted data and encrypted key.
 
+<img src="https://github.com/bruncanepa/open-e2ee/assets/8711973/96a6996a-dd03-47bd-a431-8b9e8e655df1" alt="drawing" width="800"/>
+
 #### Decryption
 
 1. Load a PGP key pair (private key encrypted, public key).
@@ -31,6 +33,10 @@ Visit [this](https://github.com/users/bruncanepa/projects/2/views/1) GitHub proj
    2. Decrypt encrypted data with key from 3.1.
 4. Do something with the decrypted data.
 
+<img src="https://github.com/bruncanepa/open-e2ee/assets/8711973/643915f8-db0d-4196-a285-1c93752333fd" alt="drawing" width="800"/>
+
+Images credit: [ProtonMail](https://proton.me/blog/what-is-pgp-encryption).
+   
 ### Features included in v1 (current version)
 
 - Create PGP key pair.
