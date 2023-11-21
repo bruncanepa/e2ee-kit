@@ -6,6 +6,7 @@ export interface E2EEItemEncrypted {
   encryptedKey: string;
   encryptedValue: string;
   keyObj: CryptoKey;
+  key: string;
 }
 
 export interface E2EEItem {
@@ -20,8 +21,8 @@ export class OpenE2EE {
 
   private passphrase: string;
   private privateKey?: PGPPrivateKey;
-  private privateKeyEncryptedText?: string;
-  private publicKeyText?: string;
+  private privateKeyEncryptedText: string = "";
+  private publicKeyText: string = "";
   private publicKey?: PGPPublicKey;
   private userId: string;
 
@@ -102,8 +103,8 @@ export class OpenE2EE {
    */
   exportMasterKeys = async () => {
     return {
-      privateKey: this.privateKeyEncryptedText || "",
-      publicKey: this.publicKeyText || "",
+      privateKey: this.privateKeyEncryptedText,
+      publicKey: this.publicKeyText,
     };
   };
 
@@ -114,11 +115,12 @@ export class OpenE2EE {
    */
   encrypt = async (data: string): Promise<E2EEItemEncrypted> => {
     const { key, keyObj } = await this.cryptoSvc.createEncryptionKey();
+    const keyHex = arrayToHexString(key);
     const [encryptedKey, encryptedValue] = await Promise.all([
       this.encryptKey(key),
-      this.pgpService.encrypt(arrayToHexString(key), data),
+      this.pgpService.encrypt(keyHex, data),
     ]);
-    return { encryptedKey, encryptedValue, keyObj };
+    return { encryptedKey, encryptedValue, keyObj, key: keyHex };
   };
 
   /**
@@ -134,5 +136,41 @@ export class OpenE2EE {
     const { key, keyObj } = await this.decryptKey(encryptedKey);
     const value = await this.pgpService.decrypt(key, encryptedData);
     return { key, value, keyObj };
+  };
+
+  share = async (receiverPublicKey: string, data: string) => {
+    const [{ encryptedKey, key, encryptedValue }, receiverPublicKeyObj] =
+      await Promise.all([
+        this.encrypt(data),
+        this.pgpService.readPublicKey(receiverPublicKey),
+      ]);
+    const receiverEncryptedKey = await this.pgpService.encryptAsymmetric(
+      this.privateKey as PGPPrivateKey,
+      receiverPublicKeyObj,
+      key
+    );
+    return {
+      senderPublicKey: this.publicKeyText,
+      senderEncryptedKey: encryptedKey,
+      encryptedValue,
+      receiverEncryptedKey,
+    };
+  };
+
+  receive = async (
+    senderPublicKey: string,
+    receiverEncryptedKey: string,
+    encryptedValue: string
+  ) => {
+    const senderPublicKeyObj = await this.pgpService.readPublicKey(
+      senderPublicKey
+    );
+    const key = await this.pgpService.decryptAsymmetric(
+      this.privateKey as PGPPrivateKey,
+      senderPublicKeyObj,
+      receiverEncryptedKey
+    );
+    const value = await this.pgpService.decrypt(key, encryptedValue);
+    return { key, value };
   };
 }

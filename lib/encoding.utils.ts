@@ -23,3 +23,5 @@ export const arrayToHexString = (bytes: Uint8Array) =>
     (str, byte) => (str += hexAlphabet[byte >> 4] + hexAlphabet[byte & 15]),
     ""
   );
+
+export const isStringAHex = (val: string) => /[0-9A-Fa-f]{6}/g.test(val);

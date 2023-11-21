@@ -2,6 +2,7 @@ import "./mocks";
 import { describe, expect, test, beforeEach } from "@jest/globals";
 import { OpenE2EE } from "../open-e2ee";
 import { PGPService } from "../pgp";
+import { isStringAHex } from "../encoding.utils";
 
 const privateKeyBegin = "-----BEGIN PGP PRIVATE KEY BLOCK-----";
 const privateKeyEnd = "-----END PGP PRIVATE KEY BLOCK-----";
@@ -56,7 +57,17 @@ describe("open-e2ee module", () => {
         privateKeyBegin + "\ninvalid private key\n" + privateKeyEnd,
         publicKey
       )
-    ).rejects.toThrow();
+    ).rejects.toThrow("readPrivateKey");
+  });
+
+  test("load(): error invalid private key because encrypted with another passphrase", async () => {
+    const otherSvc = await new OpenE2EE(userID, "other passphrase").build();
+    let { publicKey } = await etoeeSvc.exportMasterKeys();
+    let { privateKey: otherPrivateKey } = await otherSvc.exportMasterKeys();
+
+    await expect(
+      new OpenE2EE(userID, passphrase).load(otherPrivateKey, publicKey)
+    ).rejects.toThrow("decryptPrivateKey");
   });
 
   test("load(): error invalid public key", async () => {
@@ -67,7 +78,7 @@ describe("open-e2ee module", () => {
         privateKey,
         publicKeyBegin + "\ninvalid private key\n" + publicKeyEnd
       )
-    ).rejects.toThrow();
+    ).rejects.toThrow("readPublicKey");
   });
 
   test("encrypt()", async () => {
@@ -88,25 +99,27 @@ describe("open-e2ee module", () => {
     const { key, value } = await etoeeSvc.decrypt(encryptedKey, encryptedValue);
 
     expect(data).toEqual(value);
-    expect(/[0-9A-Fa-f]{6}/g.test(key)).toBeTruthy();
+    expect(isStringAHex(key)).toBeTruthy();
   });
 
   test("decrypt(): error for not encrypted key", async () => {
     const data = "data to encrypt";
 
-    const { encryptedKey, encryptedValue } = await etoeeSvc.encrypt(data);
+    const { encryptedValue } = await etoeeSvc.encrypt(data);
+
     await expect(
       etoeeSvc.decrypt("not encrypted key", encryptedValue)
-    ).rejects.toThrow("Misformed armored text");
+    ).rejects.toThrow("decrypt");
   });
 
   test("decrypt(): error for not encrypted value", async () => {
     const data = "data to encrypt";
 
-    const { encryptedKey, encryptedValue } = await etoeeSvc.encrypt(data);
+    const { encryptedKey } = await etoeeSvc.encrypt(data);
+
     await expect(
       etoeeSvc.decrypt(encryptedKey, "not encrypted value")
-    ).rejects.toThrow("Misformed armored text");
+    ).rejects.toThrow("decrypt");
   });
 
   test("decrypt(): error for value encrypted with another key", async () => {
@@ -117,8 +130,121 @@ describe("open-e2ee module", () => {
 
     await expect(
       etoeeSvc.decrypt(encryptedKey, encryptedValue)
-    ).rejects.toThrow(
-      "Error decrypting message: Session key decryption failed."
+    ).rejects.toThrow("decrypt");
+  });
+
+  test("share()", async () => {
+    const data = "data to encrypt";
+
+    const receiverSvc = await new OpenE2EE(
+      userID + "other",
+      passphrase + "other"
+    ).build();
+
+    const { publicKey } = await etoeeSvc.exportMasterKeys();
+    const { publicKey: receiverPublicKey } =
+      await receiverSvc.exportMasterKeys();
+
+    const {
+      receiverEncryptedKey,
+      senderEncryptedKey,
+      encryptedValue,
+      senderPublicKey,
+    } = await etoeeSvc.share(receiverPublicKey, data);
+
+    const { value } = await etoeeSvc.decrypt(
+      senderEncryptedKey,
+      encryptedValue
     );
+
+    expect(receiverEncryptedKey).toContain(encryptedBegin);
+    expect(receiverEncryptedKey).toContain(encryptedEnd);
+    expect(senderEncryptedKey).toContain(encryptedBegin);
+    expect(senderEncryptedKey).toContain(encryptedEnd);
+    expect(encryptedValue).toContain(encryptedBegin);
+    expect(encryptedValue).toContain(encryptedEnd);
+    expect(publicKey).toEqual(senderPublicKey);
+    expect(value).toEqual(data);
+  });
+
+  test("share(): error invalid receiver public key", async () => {
+    const data = "data to encrypt";
+
+    await expect(
+      etoeeSvc.share(
+        publicKeyBegin + "invalid receiver public key" + publicKeyEnd,
+        data
+      )
+    ).rejects.toThrow("readPublicKey");
+  });
+
+  test("receive()", async () => {
+    const data = "data to encrypt";
+
+    const receiverSvc = await new OpenE2EE(
+      userID + "other",
+      passphrase + "other"
+    ).build();
+
+    const { publicKey: receiverPublicKey } =
+      await receiverSvc.exportMasterKeys();
+
+    const { receiverEncryptedKey, encryptedValue, senderPublicKey } =
+      await etoeeSvc.share(receiverPublicKey, data);
+
+    const { key, value } = await receiverSvc.receive(
+      senderPublicKey,
+      receiverEncryptedKey,
+      encryptedValue
+    );
+
+    expect(value).toEqual(data);
+    expect(isStringAHex(key)).toBeTruthy();
+  });
+
+  test("receive(): error invalid sender public key", async () => {
+    const data = "data to encrypt";
+
+    const receiverSvc = await new OpenE2EE(
+      userID + "other",
+      passphrase + "other"
+    ).build();
+
+    const { publicKey: receiverPublicKey } =
+      await receiverSvc.exportMasterKeys();
+
+    const { receiverEncryptedKey, encryptedValue, senderPublicKey } =
+      await etoeeSvc.share(receiverPublicKey, data);
+
+    await expect(
+      receiverSvc.receive(
+        "invalid sender public key",
+        receiverEncryptedKey,
+        encryptedValue
+      )
+    ).rejects.toThrow("readPublicKey");
+  });
+
+  test("receive(): error invalid receiver encrypted key", async () => {
+    const data = "data to encrypt";
+
+    const receiverSvc = await new OpenE2EE(
+      userID + "other",
+      passphrase + "other"
+    ).build();
+
+    const { publicKey: receiverPublicKey } =
+      await receiverSvc.exportMasterKeys();
+
+    const { receiverEncryptedKey, encryptedValue, senderPublicKey } =
+      await etoeeSvc.share(receiverPublicKey, data);
+
+    await expect(
+      receiverSvc.receive(
+        senderPublicKey,
+        "invalid receiver encrypted key",
+        encryptedValue
+      )
+    ).rejects.toThrow("decryptAsymmetric");
   });
 });
