@@ -92,6 +92,7 @@ export class OpenE2EE {
     this.privateKey = privateKeyObj;
     this.publicKey = publicKeyObj;
     this.privateKeyEncryptedText = encryptedPrivateKey;
+    this.publicKeyText = publicKey;
     return this;
   };
 
@@ -101,8 +102,8 @@ export class OpenE2EE {
    */
   exportMasterKeys = async () => {
     return {
-      privateKey: this.privateKeyEncryptedText,
-      publicKey: this.publicKeyText,
+      privateKey: this.privateKeyEncryptedText || "",
+      publicKey: this.publicKeyText || "",
     };
   };
 

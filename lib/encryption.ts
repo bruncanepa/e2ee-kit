@@ -1,3 +1,5 @@
+const { crypto } = globalThis;
+
 export class EncryptionService {
   private aesKeyLengthInBytes = 32;
   private saltLength = 16;
