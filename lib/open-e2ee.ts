@@ -1,22 +1,17 @@
-import { EncryptionService } from "./encryption";
 import { PGPPrivateKey, PGPPublicKey, PGPService } from "./pgp";
-import { hexStringToArray, arrayToHexString } from "./encoding.utils";
 
 export interface E2EEItemEncrypted {
   encryptedKey: string;
   encryptedValue: string;
-  keyObj: CryptoKey;
   key: string;
 }
 
 export interface E2EEItem {
-  keyObj: CryptoKey;
   key: string;
   value: string;
 }
 
 export class OpenE2EE {
-  private cryptoSvc: EncryptionService;
   private pgpService: PGPService;
 
   private passphrase: string;
@@ -31,30 +26,10 @@ export class OpenE2EE {
    * @param passphrase master password to encrypt PGP private key
    */
   constructor(userId: string, passphrase: string) {
-    this.cryptoSvc = new EncryptionService();
     this.pgpService = new PGPService();
     this.userId = userId;
     this.passphrase = passphrase;
   }
-
-  private encryptKey = async (key: Uint8Array): Promise<string> =>
-    await this.pgpService.encryptAsymmetric(
-      this.privateKey as PGPPrivateKey,
-      this.publicKey as PGPPublicKey,
-      arrayToHexString(key)
-    );
-
-  private decryptKey = async (encryptedKey: string) => {
-    const key = await this.pgpService.decryptAsymmetric(
-      this.privateKey as PGPPrivateKey,
-      this.publicKey as PGPPublicKey,
-      encryptedKey
-    );
-    return {
-      key,
-      keyObj: await this.cryptoSvc.importSymmetricKey(hexStringToArray(key)),
-    };
-  };
 
   /**
    * Loads data with a new PGP pair.
@@ -114,13 +89,18 @@ export class OpenE2EE {
    * @returns encrypted item with its encrypted key (as value and CryptoKey).
    */
   encrypt = async (data: string): Promise<E2EEItemEncrypted> => {
-    const { key, keyObj } = await this.cryptoSvc.createEncryptionKey();
-    const keyHex = arrayToHexString(key);
+    const key = await this.pgpService.generateEncryptionKey(
+      this.publicKey as PGPPublicKey
+    );
     const [encryptedKey, encryptedValue] = await Promise.all([
-      this.encryptKey(key),
-      this.pgpService.encrypt(keyHex, data),
+      this.pgpService.encryptAsymmetric(
+        this.privateKey as PGPPrivateKey,
+        this.publicKey as PGPPublicKey,
+        key
+      ),
+      this.pgpService.encrypt(key, data),
     ]);
-    return { encryptedKey, encryptedValue, keyObj, key: keyHex };
+    return { encryptedKey, encryptedValue, key };
   };
 
   /**
@@ -133,9 +113,13 @@ export class OpenE2EE {
     encryptedKey: string,
     encryptedData: string
   ): Promise<E2EEItem> => {
-    const { key, keyObj } = await this.decryptKey(encryptedKey);
+    const key = await this.pgpService.decryptAsymmetric(
+      this.privateKey as PGPPrivateKey,
+      this.publicKey as PGPPublicKey,
+      encryptedKey
+    );
     const value = await this.pgpService.decrypt(key, encryptedData);
-    return { key, value, keyObj };
+    return { key, value };
   };
 
   share = async (receiverPublicKey: string, data: string) => {

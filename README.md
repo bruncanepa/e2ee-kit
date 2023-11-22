@@ -6,10 +6,9 @@ Inspired by [ProtonMail](https://proton.me/blog/encrypted-email) and [ProtonCale
 
 Visit [this](https://github.com/users/bruncanepa/projects/2/views/1) GitHub project to stay informed about the current status of its features.
 
-### Libraries and Web Browser's APIs used
+### Libraries used
 
 - [OpenPGP](https://github.com/ProtonMail/openpgpjs)
-- [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API)
 
 ### Features included in current version v1.1
 
@@ -24,8 +23,8 @@ Visit [this](https://github.com/users/bruncanepa/projects/2/views/1) GitHub proj
 #### Encryption flow
 
 1. Create (or load) a PGP key pair (`privateKey` encrypted, `publicKey`) associated with your `passphrase`.
-2. Creates AES-256 `key`.
-3. Encrypt `value` with the `key`. Returns `encryptedValue`.
+2. Creates 32-bytes `key`.
+3. Encrypt with AES-256 the `value` with the `key`. Returns `encryptedValue`.
 4. Encrypt `key`, with your PGP `privateKey`. Returns `encryptedKey`.
 5. Save both `encryptedValue` and `encryptedKey`.
 

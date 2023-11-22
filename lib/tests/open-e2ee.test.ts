@@ -1,4 +1,4 @@
-import "./mocks";
+// import "./mocks";
 import { describe, expect, test, beforeEach } from "@jest/globals";
 import { OpenE2EE } from "../open-e2ee";
 import { PGPService } from "../pgp";
@@ -57,7 +57,7 @@ describe("open-e2ee module", () => {
         privateKeyBegin + "\ninvalid private key\n" + privateKeyEnd,
         publicKey
       )
-    ).rejects.toThrow("readPrivateKey");
+    ).rejects.toThrow("pgp.readPrivateKey");
   });
 
   test("load(): error invalid private key because encrypted with another passphrase", async () => {
@@ -67,7 +67,7 @@ describe("open-e2ee module", () => {
 
     await expect(
       new OpenE2EE(userID, passphrase).load(otherPrivateKey, publicKey)
-    ).rejects.toThrow("decryptPrivateKey");
+    ).rejects.toThrow("pgp.decryptPrivateKey");
   });
 
   test("load(): error invalid public key", async () => {
@@ -78,7 +78,7 @@ describe("open-e2ee module", () => {
         privateKey,
         publicKeyBegin + "\ninvalid private key\n" + publicKeyEnd
       )
-    ).rejects.toThrow("readPublicKey");
+    ).rejects.toThrow("pgp.readPublicKey");
   });
 
   test("encrypt()", async () => {
@@ -109,7 +109,7 @@ describe("open-e2ee module", () => {
 
     await expect(
       etoeeSvc.decrypt("not encrypted key", encryptedValue)
-    ).rejects.toThrow("decrypt");
+    ).rejects.toThrow("pgp.decrypt");
   });
 
   test("decrypt(): error for not encrypted value", async () => {
@@ -119,7 +119,7 @@ describe("open-e2ee module", () => {
 
     await expect(
       etoeeSvc.decrypt(encryptedKey, "not encrypted value")
-    ).rejects.toThrow("decrypt");
+    ).rejects.toThrow("pgp.decrypt");
   });
 
   test("decrypt(): error for value encrypted with another key", async () => {
@@ -130,7 +130,7 @@ describe("open-e2ee module", () => {
 
     await expect(
       etoeeSvc.decrypt(encryptedKey, encryptedValue)
-    ).rejects.toThrow("decrypt");
+    ).rejects.toThrow("pgp.decrypt");
   });
 
   test("share()", async () => {
@@ -175,7 +175,7 @@ describe("open-e2ee module", () => {
         publicKeyBegin + "invalid receiver public key" + publicKeyEnd,
         data
       )
-    ).rejects.toThrow("readPublicKey");
+    ).rejects.toThrow("pgp.readPublicKey");
   });
 
   test("receive()", async () => {
@@ -222,7 +222,7 @@ describe("open-e2ee module", () => {
         receiverEncryptedKey,
         encryptedValue
       )
-    ).rejects.toThrow("readPublicKey");
+    ).rejects.toThrow("pgp.readPublicKey");
   });
 
   test("receive(): error invalid receiver encrypted key", async () => {
@@ -245,6 +245,6 @@ describe("open-e2ee module", () => {
         "invalid receiver encrypted key",
         encryptedValue
       )
-    ).rejects.toThrow("decryptAsymmetric");
+    ).rejects.toThrow("pgp.decryptAsymmetric");
   });
 });

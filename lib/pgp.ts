@@ -1,5 +1,6 @@
 import * as openpgp from "openpgp";
 import { tryCatch } from "./error";
+import { arrayToHexString } from "./encoding.utils";
 
 openpgp.config.preferredSymmetricAlgorithm = 9; // set default to aes256
 
@@ -8,7 +9,7 @@ export class PGPPublicKey extends openpgp.PublicKey {}
 
 export class PGPService {
   generateKeyPair = tryCatch(
-    "generateKeyPair",
+    "pgp.generateKeyPair",
     async (passphrase: string, userId: string) =>
       await openpgp.generateKey({
         type: "ecc", // Type of the key, defaults to ECC
@@ -19,14 +20,26 @@ export class PGPService {
       })
   );
 
+  generateEncryptionKey = tryCatch(
+    "pgp.generateEncryptionKey",
+    async (publicKey: PGPPublicKey): Promise<string> =>
+      arrayToHexString(
+        (
+          await openpgp.generateSessionKey({
+            encryptionKeys: publicKey,
+          })
+        ).data
+      )
+  );
+
   readPublicKey = tryCatch(
-    "readPublicKey",
+    "pgp.readPublicKey",
     async (publicKeyArmored: string) =>
       (await openpgp.readKey({ armoredKey: publicKeyArmored })) as PGPPublicKey
   );
 
   readPrivateKey = tryCatch(
-    "readPrivateKey",
+    "pgp.readPrivateKey",
     async (privateKeyArmored: string) =>
       (await openpgp.readPrivateKey({
         armoredKey: privateKeyArmored,
@@ -34,7 +47,7 @@ export class PGPService {
   );
 
   decryptPrivateKey = tryCatch(
-    "decryptPrivateKey",
+    "pgp.decryptPrivateKey",
     async (privateKeyArmored: string, passphrase: string) => {
       const privateKey = await this.readPrivateKey(privateKeyArmored);
       return (await openpgp.decryptKey({
@@ -45,7 +58,7 @@ export class PGPService {
   );
 
   encryptAsymmetric = tryCatch(
-    "encryptAsymmetric",
+    "pgp.encryptAsymmetric",
     async (
       privateKey: openpgp.PrivateKey,
       publicKey: openpgp.PublicKey,
@@ -61,7 +74,7 @@ export class PGPService {
   );
 
   decryptAsymmetric = tryCatch(
-    "decryptAsymmetric",
+    "pgp.decryptAsymmetric",
     async (
       privateKey: PGPPrivateKey,
       publicKey: PGPPublicKey,
@@ -80,7 +93,7 @@ export class PGPService {
   );
 
   encrypt = tryCatch(
-    "encrypt",
+    "pgp.encrypt",
     async (key: string, data: string): Promise<string> => {
       const message = await openpgp.createMessage({ text: data });
       return (await openpgp.encrypt({
@@ -91,7 +104,7 @@ export class PGPService {
   );
 
   decrypt = tryCatch(
-    "decrypt",
+    "pgp.decrypt",
     async (key: string, data: string): Promise<string> => {
       const message = await openpgp.readMessage({ armoredMessage: data });
       return (await openpgp.decrypt({ message, passwords: key }))
