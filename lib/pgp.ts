@@ -60,16 +60,17 @@ export class PGPService {
   encryptAsymmetric = tryCatch(
     "pgp.encryptAsymmetric",
     async (
-      privateKey: openpgp.PrivateKey,
-      publicKey: openpgp.PublicKey,
+      privateKey: PGPPrivateKey,
+      encryptionKeys: PGPPublicKey[],
       data: string
     ): Promise<string> => {
       const message = await openpgp.createMessage({ text: data });
-      return (await openpgp.encrypt({
+      const encrypted = await openpgp.encrypt({
         message,
-        encryptionKeys: publicKey,
+        encryptionKeys,
         signingKeys: privateKey,
-      })) as Promise<string>;
+      });
+      return encrypted as string;
     }
   );
 
@@ -77,18 +78,17 @@ export class PGPService {
     "pgp.decryptAsymmetric",
     async (
       privateKey: PGPPrivateKey,
-      publicKey: PGPPublicKey,
+      verificationKeys: PGPPublicKey[],
       data: string
     ): Promise<string> => {
       const message = await openpgp.readMessage({ armoredMessage: data });
-      return (
-        await openpgp.decrypt({
-          message,
-          verificationKeys: publicKey,
-          decryptionKeys: privateKey,
-          expectSigned: true,
-        })
-      ).data as string;
+      const decrypted = await openpgp.decrypt({
+        message,
+        verificationKeys: verificationKeys,
+        decryptionKeys: privateKey,
+        expectSigned: true,
+      });
+      return decrypted.data as string;
     }
   );
 
@@ -96,10 +96,11 @@ export class PGPService {
     "pgp.encrypt",
     async (key: string, data: string): Promise<string> => {
       const message = await openpgp.createMessage({ text: data });
-      return (await openpgp.encrypt({
+      const encrypted = await openpgp.encrypt({
         message,
         passwords: key,
-      })) as Promise<string>;
+      });
+      return encrypted as string;
     }
   );
 
@@ -107,8 +108,8 @@ export class PGPService {
     "pgp.decrypt",
     async (key: string, data: string): Promise<string> => {
       const message = await openpgp.readMessage({ armoredMessage: data });
-      return (await openpgp.decrypt({ message, passwords: key }))
-        .data as Promise<string>;
+      const decrypted = await openpgp.decrypt({ message, passwords: key });
+      return decrypted.data as string;
     }
   );
 }

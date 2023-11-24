@@ -1,3 +1,9 @@
+export const stringToUint8Array = (value: string): Uint8Array =>
+  new TextEncoder().encode(value);
+
+export const uint8ArrayToString = (value: Uint8Array): string =>
+  new TextDecoder().decode(value);
+
 /**
  * Convert a hex string to an array of 8-bit integers
  * @param hex  A hex string to convert
@@ -24,4 +30,4 @@ export const arrayToHexString = (bytes: Uint8Array) =>
     ""
   );
 
-export const isStringAHex = (val: string) => /[0-9A-Fa-f]{6}/g.test(val);
+export const isStringHex = (val: string) => /[0-9A-Fa-f]{6}/g.test(val);

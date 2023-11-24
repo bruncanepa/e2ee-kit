@@ -1,9 +1,9 @@
 "use client";
 import React, { useState, useMemo, useEffect } from "react";
-import { OpenE2EE } from "../lib/open-e2ee";
+import { OpenE2EE } from "../../../lib/open-e2ee";
 
 const userID = "2997e638-b01b-446f-be33-df9ec8b4f206";
-export default function Home() {
+export function OpenE2EEExample() {
   const [passphrase, setPassphrase] = useState("passphrase-long-super-long");
   const etoeeSvc = useMemo(() => new OpenE2EE(userID, passphrase), []);
 
@@ -12,8 +12,6 @@ export default function Home() {
   const [decrypted, setDecrypted] = useState<string>("");
   const [privateKey, setPrivateKey] = useState("");
   const [publicKey, setPublicKey] = useState("");
-  const [encryptedItemKey, setEncryptedItemKey] = useState("");
-  const [itemKey, setItemKey] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -26,19 +24,13 @@ export default function Home() {
   }, []);
 
   const onEncrypt = async () => {
-    console.log("start to encrypt");
     const item = await etoeeSvc.encrypt(data);
-    console.log("end to encrypt");
-    setEncryptedItemKey(item.encryptedKey);
-    setEncrypted(item.encryptedValue);
+    setEncrypted(item.encryptedMessage);
   };
 
   const onDecrypt = async () => {
-    console.log("start to decrypt");
-    const item = await etoeeSvc.decrypt(encryptedItemKey, encrypted);
-    console.log("end to decrypt");
-    setDecrypted(item.value);
-    setItemKey(item.key);
+    const item = await etoeeSvc.decrypt(encrypted);
+    setDecrypted(JSON.stringify(item));
   };
 
   const onLoadPGPPrivateKey = async () => {
@@ -47,11 +39,44 @@ export default function Home() {
       publicKey
     );
     const [item1, item2] = await Promise.all([
-      etoeeSvc.decrypt(encryptedItemKey, encrypted),
-      svcLoaded.decrypt(encryptedItemKey, encrypted),
+      etoeeSvc.decrypt(encrypted),
+      svcLoaded.decrypt(encrypted),
     ]);
+    alert(item1.data === item2.data ? "load successfull" : "load with errors");
+  };
+
+  const onShare = async () => {
+    const receiverSvc = await new OpenE2EE(userID + 1, passphrase + 1).build();
+    const { publicKey: receiverPublicKey } =
+      await receiverSvc.exportMasterKeys();
+
+    const share = async () => {
+      const { senderPublicKey, receiverEncryptedMessage } =
+        await etoeeSvc.share(receiverPublicKey, encrypted);
+
+      const { data: receiverDecryptedData, key } = await receiverSvc.receive(
+        senderPublicKey,
+        receiverEncryptedMessage
+      );
+      return receiverDecryptedData;
+    };
+
+    const shareNew = async () => {
+      const { senderPublicKey, receiverEncryptedMessage } =
+        await etoeeSvc.shareNew(receiverPublicKey, data);
+
+      const { data: receiverDecryptedData } = await receiverSvc.receive(
+        senderPublicKey,
+        receiverEncryptedMessage
+      );
+      return receiverDecryptedData;
+    };
+
+    const values = await Promise.all([share(), shareNew()]);
+
     alert(
-      item1.value === item2.value ? "load successfull" : "load with errors"
+      "share done: " +
+        `${values.every((v) => v === data) ? "valid" : "invalid"}`
     );
   };
 
@@ -61,7 +86,6 @@ export default function Home() {
         style={{
           display: "flex",
           flexDirection: "column",
-          width: "60%",
           wordWrap: "break-word",
         }}
       >
@@ -88,14 +112,6 @@ export default function Home() {
         <span>{decrypted}</span>
         <br />
 
-        <label>AES item key</label>
-        <span>{itemKey}</span>
-        <br />
-
-        <label>AES encrypted item key</label>
-        <span>{encryptedItemKey}</span>
-        <br />
-
         <label>PGP private key</label>
         <span>{privateKey}</span>
         <br />
@@ -107,6 +123,11 @@ export default function Home() {
         <button onClick={onLoadPGPPrivateKey}>
           Load external PGP private key
         </button>
+        <br />
+        <br />
+
+        <button onClick={onShare}>Share encrypted data</button>
+        <br />
         <br />
       </div>
     </main>
