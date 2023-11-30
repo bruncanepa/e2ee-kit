@@ -1,23 +1,28 @@
 # Open E2EE
 
-## Open tools to make E2EE easier for any Web app
+## Open-source tools to simplify E2EE on the Web
 
 Inspired by [ProtonMail](https://proton.me/blog/encrypted-email) and [ProtonCalendar](https://proton.me/blog/protoncalendar-security-model) privacy and security practices.
-
-Visit [this](https://github.com/users/bruncanepa/projects/2/views/1) GitHub project to stay informed about the current status of its features.
 
 ### Libraries used
 
 - [OpenPGP](https://github.com/ProtonMail/openpgpjs)
 - [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API)
 
-### Features included in current version v1.1
+### Features
+
+#### Included
 
 - Create PGP key pair.
 - Export PGP key pair (private key encrypted).
 - Create AES-256 keys and encrypt them with your PGP private key.
 - Encrypt and decrypt any string using AES-256.
 - Share and receive data encrypted with other's PGP public key and signed with your PGP private key.
+
+#### Next
+
+- File encryption, using a 32-bytes key with AES-256 to encrypt every file chunk and using PGP public key to encrypt the key.
+- Share encrypted file, encrypting the 32-bytes key with receiver PGP public key.
 
 ### Main flows
 
