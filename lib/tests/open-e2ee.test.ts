@@ -4,13 +4,13 @@ import { OpenE2EE } from "../open-e2ee";
 import { PGPService } from "../pgp";
 import { isStringHex } from "../encoding.utils";
 import {
-  isEncryptedMessageFormat,
+  isEncryptedItemFormat,
   privateKeyBegin,
   privateKeyEnd,
   publicKeyBegin,
   publicKeyEnd,
-  readEncryptedMessage,
-  writeEncryptedMessage,
+  readEncryptedItem,
+  writeEncryptedItem,
 } from "../models";
 
 describe("open-e2ee module", () => {
@@ -86,20 +86,19 @@ describe("open-e2ee module", () => {
   test("encrypt()", async () => {
     const data = "data to encrypt";
 
-    const { key, encryptedMessage } = await etoeeSvc.encrypt(data);
+    const { shareKey: key, encryptedMessage } = await etoeeSvc.encrypt(data);
 
     expect(encryptedMessage.includes(key)).toBeFalsy();
     expect(encryptedMessage.includes(data)).toBeFalsy();
-    expect(isEncryptedMessageFormat(encryptedMessage)).toBeTruthy();
+    expect(isEncryptedItemFormat(encryptedMessage)).toBeTruthy();
   });
 
   test("decrypt()", async () => {
     const data = "data to encrypt";
 
-    const { key, encryptedMessage } = await etoeeSvc.encrypt(data);
-    const { key: decryptedKey, data: decryptedData } = await etoeeSvc.decrypt(
-      encryptedMessage
-    );
+    const { shareKey: key, encryptedMessage } = await etoeeSvc.encrypt(data);
+    const { shareKey: decryptedKey, data: decryptedData } =
+      await etoeeSvc.decrypt(encryptedMessage);
 
     expect(data).toEqual(decryptedData);
     expect(key).toEqual(decryptedKey);
@@ -108,27 +107,28 @@ describe("open-e2ee module", () => {
   test("decrypt(): error for not encrypted key", async () => {
     const data = "data to encrypt";
 
-    const { key, encryptedMessage } = await etoeeSvc.encrypt(data);
+    const { shareKey: key, encryptedMessage } = await etoeeSvc.encrypt(data);
 
     await expect(
       etoeeSvc.decrypt(
-        writeEncryptedMessage(
+        writeEncryptedItem(
           key,
-          readEncryptedMessage(encryptedMessage).encryptedData
+          readEncryptedItem(encryptedMessage).encryptedData
         )
       )
-    ).rejects.toThrow("pgp.decrypt");
+    ).rejects.toThrow("pgp.decryptAsymmetric");
   });
 
   test("decrypt(): error for not encrypted value", async () => {
     const data = "data to encrypt";
 
     const { encryptedMessage } = await etoeeSvc.encrypt(data);
-    const { encryptedKey } = readEncryptedMessage(encryptedMessage);
+    const { encryptedShareKey: encryptedKey } =
+      readEncryptedItem(encryptedMessage);
 
     await expect(
-      etoeeSvc.decrypt(writeEncryptedMessage(encryptedKey, data))
-    ).rejects.toThrow("pgp.decrypt");
+      etoeeSvc.decrypt(writeEncryptedItem(encryptedKey, data))
+    ).rejects.toThrow("crypto.decrypt");
   });
 
   test("decrypt(): error for value encrypted with another key", async () => {
@@ -141,12 +141,22 @@ describe("open-e2ee module", () => {
 
     await expect(
       etoeeSvc.decrypt(
-        writeEncryptedMessage(
-          readEncryptedMessage(encryptedMessage).encryptedKey,
-          readEncryptedMessage(encryptedMessageOther).encryptedData
+        writeEncryptedItem(
+          readEncryptedItem(encryptedMessage).encryptedShareKey,
+          readEncryptedItem(encryptedMessageOther).encryptedData
         )
       )
-    ).rejects.toThrow("pgp.decrypt");
+    ).rejects.toThrow("crypto.decrypt");
+  });
+
+  test("decrypt(): error for encrypted message not signed", async () => {
+    const data = "data to encrypt";
+
+    const { encryptedMessage } = await etoeeSvc.encrypt(data, false);
+
+    await expect(etoeeSvc.decrypt(encryptedMessage)).rejects.toThrow(
+      "pgp.decryptAsymmetric: Error decrypting message: Message is not signed"
+    );
   });
 
   test("share()", async () => {
@@ -171,7 +181,7 @@ describe("open-e2ee module", () => {
       receiverEncryptedMessage
     );
 
-    expect(isEncryptedMessageFormat(receiverEncryptedMessage)).toBeTruthy();
+    expect(isEncryptedItemFormat(receiverEncryptedMessage)).toBeTruthy();
     expect(publicKey).toEqual(senderPublicKey);
     expect(receiverDecryptedData).toEqual(data);
   });
@@ -207,7 +217,7 @@ describe("open-e2ee module", () => {
       receiverEncryptedMessage
     );
 
-    expect(isEncryptedMessageFormat(receiverEncryptedMessage)).toBeTruthy();
+    expect(isEncryptedItemFormat(receiverEncryptedMessage)).toBeTruthy();
     expect(publicKey).toEqual(senderPublicKey);
     expect(receiverDecryptedData).toEqual(data);
   });
@@ -237,7 +247,7 @@ describe("open-e2ee module", () => {
     const { senderPublicKey, receiverEncryptedMessage } =
       await etoeeSvc.shareNew(receiverPublicKey, data);
 
-    const { key, data: decryptedData } = await receiverSvc.receive(
+    const { shareKey: key, data: decryptedData } = await receiverSvc.receive(
       senderPublicKey,
       receiverEncryptedMessage
     );

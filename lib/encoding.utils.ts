@@ -31,3 +31,14 @@ export const arrayToHexString = (bytes: Uint8Array) =>
   );
 
 export const isStringHex = (val: string) => /[0-9A-Fa-f]{6}/g.test(val);
+
+export function mergeUint8Arrays(...arrays: Uint8Array[]) {
+  const merged = new Uint8Array(
+    arrays.reduce((sum, arr) => sum + arr.length, 0)
+  );
+  arrays.reduce((startIndex, arr) => {
+    merged.set(arr, startIndex);
+    return startIndex + arr.length;
+  }, 0);
+  return merged;
+}

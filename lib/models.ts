@@ -5,13 +5,13 @@ export const publicKeyEnd = "-----END PGP PUBLIC KEY BLOCK-----\n";
 export const pgpMessageBegin = "-----BEGIN PGP MESSAGE-----\n";
 export const pgpMessageEnd = "-----END PGP MESSAGE-----\n";
 
-export interface MessageItemEncrypted {
-  key: string;
+export interface EncryptItemOut {
+  shareKey: string;
   encryptedMessage: string;
 }
 
-export interface MessageItem {
-  key: string;
+export interface DecryptItemOut {
+  shareKey: string;
   data: string;
 }
 
@@ -24,7 +24,7 @@ export interface ShareNewItemOut extends ShareItemOut {
   senderEncryptedMessage: string;
 }
 
-export interface ReceiveItemOut extends MessageItem {}
+export interface ReceiveItemOut extends DecryptItemOut {}
 
 const exportPGPMessage = (pgpMessage: string) => pgpMessage;
 // pgpMessage
@@ -35,15 +35,15 @@ const importEncryptedValue = (encryptedValue: string) => encryptedValue;
 // `${pgpMessageBegin}${encryptedValue}${pgpMessageEnd}`;
 
 const encryptedMessageSeparator = "";
-export const writeEncryptedMessage = (
-  encryptedKey: string,
+export const writeEncryptedItem = (
+  encryptedShareKey: string,
   encryptedData: string
 ) =>
   `${exportPGPMessage(
-    encryptedKey
+    encryptedShareKey
   )}${encryptedMessageSeparator}${exportPGPMessage(encryptedData)}`;
 
-export const readEncryptedMessage = (encryptedMessage: string) => {
+export const readEncryptedItem = (encryptedMessage: string) => {
   const positionToSplit =
     encryptedMessage.indexOf(pgpMessageEnd) + pgpMessageEnd.length;
   const encryptedKey = encryptedMessage.substring(0, positionToSplit);
@@ -51,22 +51,18 @@ export const readEncryptedMessage = (encryptedMessage: string) => {
     positionToSplit + encryptedMessageSeparator.length
   );
   return {
-    encryptedKey: importEncryptedValue(encryptedKey),
+    encryptedShareKey: importEncryptedValue(encryptedKey),
     encryptedData: importEncryptedValue(encryptedData),
   };
 };
 
-export const isEncryptedMessageFormat = (encryptedMessage: string): boolean => {
-  const firstBeginIndex = encryptedMessage.indexOf(pgpMessageBegin);
-  const lastBeginIndex = encryptedMessage.lastIndexOf(pgpMessageBegin);
-
-  const firstEndIndex = encryptedMessage.indexOf(pgpMessageEnd);
-  const lastEndIndex = encryptedMessage.lastIndexOf(pgpMessageEnd);
+export const isEncryptedItemFormat = (encryptedMessage: string): boolean => {
+  const beginIndex = encryptedMessage.indexOf(pgpMessageBegin);
+  const endIndex = encryptedMessage.indexOf(pgpMessageEnd);
 
   return (
-    firstBeginIndex >= 0 &&
-    firstBeginIndex !== lastBeginIndex &&
-    firstEndIndex >= 0 &&
-    firstEndIndex !== lastEndIndex
+    beginIndex >= 0 &&
+    beginIndex < endIndex &&
+    endIndex + 1 + pgpMessageEnd.length < encryptedMessage.length
   );
 };

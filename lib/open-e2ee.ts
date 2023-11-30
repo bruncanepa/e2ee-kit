@@ -1,16 +1,18 @@
+import { CryptoService } from "./crypto";
 import {
-  MessageItemEncrypted,
-  MessageItem,
-  writeEncryptedMessage,
-  readEncryptedMessage,
+  writeEncryptedItem,
+  readEncryptedItem,
   ShareItemOut,
   ShareNewItemOut,
   ReceiveItemOut,
+  DecryptItemOut,
+  EncryptItemOut,
 } from "./models";
 import { PGPPrivateKey, PGPPublicKey, PGPService } from "./pgp";
 
 export class OpenE2EE {
   private pgpService: PGPService;
+  private cryptoService: CryptoService;
 
   private passphrase: string;
   private privateKey?: PGPPrivateKey;
@@ -25,6 +27,7 @@ export class OpenE2EE {
    */
   constructor(userId: string, passphrase: string) {
     this.pgpService = new PGPService();
+    this.cryptoService = new CryptoService();
     this.userId = userId;
     this.passphrase = passphrase;
   }
@@ -86,21 +89,24 @@ export class OpenE2EE {
    * @param data value to encrypt
    * @returns encrypted message with key and data.
    */
-  encrypt = async (data: string): Promise<MessageItemEncrypted> => {
-    const key = await this.pgpService.generateEncryptionKey(
+  encrypt = async (
+    data: string,
+    sign: boolean = true
+  ): Promise<EncryptItemOut> => {
+    const shareKey = await this.pgpService.generateShareKey(
       this.publicKey as PGPPublicKey
     );
-    const [encryptedKey, encryptedData] = await Promise.all([
+    const [encryptedShareKey, encryptedData] = await Promise.all([
       this.pgpService.encryptAsymmetric(
-        this.privateKey as PGPPrivateKey,
+        sign ? this.privateKey : undefined,
         [this.publicKey as PGPPublicKey],
-        key
+        shareKey
       ),
-      this.pgpService.encrypt(key, data),
+      this.cryptoService.encrypt(shareKey, data),
     ]);
     return {
-      key,
-      encryptedMessage: writeEncryptedMessage(encryptedKey, encryptedData),
+      shareKey,
+      encryptedMessage: writeEncryptedItem(encryptedShareKey, encryptedData),
     };
   };
 
@@ -112,23 +118,23 @@ export class OpenE2EE {
   decrypt = async (
     encryptedMessage: string,
     externalEncryptionKeys: string[] = []
-  ): Promise<MessageItem> => {
-    const { encryptedKey, encryptedData } =
-      readEncryptedMessage(encryptedMessage);
+  ): Promise<DecryptItemOut> => {
+    const { encryptedShareKey, encryptedData } =
+      readEncryptedItem(encryptedMessage);
     const externalEncryptionKeysObj = await Promise.all(
       externalEncryptionKeys.map((e) => this.pgpService.readPublicKey(e))
     );
-    const key = await this.pgpService.decryptAsymmetric(
+    const shareKey = await this.pgpService.decryptAsymmetric(
       this.privateKey as PGPPrivateKey,
       [this.publicKey as PGPPublicKey, ...externalEncryptionKeysObj],
-      encryptedKey
+      encryptedShareKey
     );
-    const data = await this.pgpService.decrypt(key, encryptedData);
-    return { key, data };
+    const data = await this.cryptoService.decrypt(shareKey, encryptedData);
+    return { shareKey, data };
   };
 
   /**
-   * Share encrypted data with another user, encrypting messages with corresponding PGP public keys
+   * Share encrypted data with another user, encrypting messages with receiver PGP public key and signed with sender PGP private key
    * @param receiverPublicKey receiver PGP public key
    * @param data data to encrypt and share
    * @returns senderPublicKey your publicKey to verify signature
@@ -136,30 +142,29 @@ export class OpenE2EE {
    */
   share = async (
     receiverPublicKey: string,
-    encryptedMessage: string
+    encryptedItem: string
   ): Promise<ShareItemOut> => {
-    const { encryptedKey, encryptedData } =
-      readEncryptedMessage(encryptedMessage);
+    const { encryptedShareKey, encryptedData } =
+      readEncryptedItem(encryptedItem);
 
-    const receiverPublicKeyObj = await this.pgpService.readPublicKey(
-      receiverPublicKey
-    );
-
-    const sharedKey = await this.pgpService.decryptAsymmetric(
-      this.privateKey as PGPPrivateKey,
-      [this.publicKey as PGPPublicKey],
-      encryptedKey
-    );
+    const [receiverPublicKeyObj, shareKey] = await Promise.all([
+      this.pgpService.readPublicKey(receiverPublicKey),
+      this.pgpService.decryptAsymmetric(
+        this.privateKey as PGPPrivateKey,
+        [this.publicKey as PGPPublicKey],
+        encryptedShareKey
+      ),
+    ]);
 
     const receiverEncryptedKey = await this.pgpService.encryptAsymmetric(
       this.privateKey as PGPPrivateKey,
       [this.publicKey as PGPPublicKey, receiverPublicKeyObj],
-      sharedKey
+      shareKey
     );
 
     return {
       senderPublicKey: this.publicKeyText,
-      receiverEncryptedMessage: writeEncryptedMessage(
+      receiverEncryptedMessage: writeEncryptedItem(
         receiverEncryptedKey,
         encryptedData
       ),
@@ -167,7 +172,7 @@ export class OpenE2EE {
   };
 
   /**
-   * Share not encrypted data with another user, encrypting messages with corresponding PGP public keys
+   * Share not encrypted data with another user, encrypting messages with receiver PGP public key and signed with sender PGP private key
    * @param receiverPublicKey receiver PGP public key
    * @param data data to encrypt and share
    * @returns same as 'share()', and senderEncryptedMessage with the message encrypted with your PGP public key
@@ -179,24 +184,24 @@ export class OpenE2EE {
     const receiverPublicKeyObj = await this.pgpService.readPublicKey(
       receiverPublicKey
     );
-    const { key, encryptedMessage } = await this.encrypt(data);
+    const { shareKey, encryptedMessage } = await this.encrypt(data);
     const receiverEncryptedKey = await this.pgpService.encryptAsymmetric(
       this.privateKey as PGPPrivateKey,
       [receiverPublicKeyObj],
-      key
+      shareKey
     );
     return {
       senderPublicKey: this.publicKeyText,
       senderEncryptedMessage: encryptedMessage,
-      receiverEncryptedMessage: writeEncryptedMessage(
+      receiverEncryptedMessage: writeEncryptedItem(
         receiverEncryptedKey,
-        readEncryptedMessage(encryptedMessage).encryptedData
+        readEncryptedItem(encryptedMessage).encryptedData
       ),
     };
   };
 
   /**
-   * Receive an encrypted message with my PGP public key
+   * Receive an encrypted message with my PGP public key and signed with sender PGP private key
    * @param senderPublicKey sender's PGP public key to validate signature
    * @param encryptedMessage
    * @returns decrypted key and data

@@ -54,10 +54,8 @@ export function OpenE2EEExample() {
       const { senderPublicKey, receiverEncryptedMessage } =
         await etoeeSvc.share(receiverPublicKey, encrypted);
 
-      const { data: receiverDecryptedData, key } = await receiverSvc.receive(
-        senderPublicKey,
-        receiverEncryptedMessage
-      );
+      const { data: receiverDecryptedData, shareKey: key } =
+        await receiverSvc.receive(senderPublicKey, receiverEncryptedMessage);
       return receiverDecryptedData;
     };
 

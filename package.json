@@ -19,7 +19,8 @@
     "url": "https://github.com/bruncanepa/open-e2ee"
   },
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "test-coverage": "jest --coverage"
   },
   "dependencies": {
     "openpgp": "^5.11.0"

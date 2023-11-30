@@ -20,16 +20,14 @@ export class PGPService {
       })
   );
 
-  generateEncryptionKey = tryCatch(
-    "pgp.generateEncryptionKey",
-    async (publicKey: PGPPublicKey): Promise<string> =>
-      arrayToHexString(
-        (
-          await openpgp.generateSessionKey({
-            encryptionKeys: publicKey,
-          })
-        ).data
-      )
+  generateShareKey = tryCatch(
+    "pgp.generateShareKey",
+    async (publicKey: PGPPublicKey): Promise<string> => {
+      const shareKey = await openpgp.generateSessionKey({
+        encryptionKeys: publicKey,
+      });
+      return arrayToHexString(shareKey.data);
+    }
   );
 
   readPublicKey = tryCatch(
@@ -60,7 +58,7 @@ export class PGPService {
   encryptAsymmetric = tryCatch(
     "pgp.encryptAsymmetric",
     async (
-      privateKey: PGPPrivateKey,
+      privateKey: PGPPrivateKey | undefined,
       encryptionKeys: PGPPublicKey[],
       data: string
     ): Promise<string> => {
