@@ -8,6 +8,7 @@ Inspired by [ProtonMail](https://proton.me/blog/encrypted-email) and [ProtonCale
 
 - [OpenPGP](https://github.com/ProtonMail/openpgpjs)
 - [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API)
+- [Pako](https://github.com/nodeca/pako)
 
 ### Features
 
@@ -18,11 +19,11 @@ Inspired by [ProtonMail](https://proton.me/blog/encrypted-email) and [ProtonCale
 - Create AES-256 keys and encrypt them with your PGP private key.
 - Encrypt and decrypt any string using AES-256.
 - Share and receive data encrypted with other's PGP public key and signed with your PGP private key.
+- File encryption, using a 32-bytes key with AES-256 to encrypt every file chunk and using PGP public key to encrypt the key.
 
 #### Next
 
-- File encryption, using a 32-bytes key with AES-256 to encrypt every file chunk and using PGP public key to encrypt the key.
-- Share encrypted file, encrypting the 32-bytes key with receiver PGP public key.
+- Share encrypted file, encrypting the 32-bytes key with receiver PGP public key and signed with sender PGP private key.
 
 ### Main flows
 

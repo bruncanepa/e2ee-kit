@@ -7,8 +7,10 @@ import {
   ReceiveItemOut,
   DecryptItemOut,
   EncryptItemOut,
+  pgpMessageEnd,
 } from "./models";
 import { PGPPrivateKey, PGPPublicKey, PGPService } from "./pgp";
+import { FileEncryption } from "./file/fileChunkreader";
 
 export class OpenE2EE {
   private pgpService: PGPService;
@@ -211,4 +213,105 @@ export class OpenE2EE {
     encryptedMessage: string
   ): Promise<ReceiveItemOut> =>
     await this.decrypt(encryptedMessage, [senderPublicKey]);
+
+  encryptFileOnOneGo = async (file: File) => {
+    const key = await this.pgpService.generateShareKey(
+      this.publicKey as PGPPublicKey
+    );
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const data = e.target?.result as string;
+      const encrypted = await this.cryptoService.encryptFile(key, data);
+      const anchor = document.createElement("a");
+      anchor.href = "data:application/octet-stream," + btoa(encrypted);
+      anchor.download = file.name + ".enc";
+      anchor.click();
+    };
+    reader.readAsDataURL(file);
+
+    const encryptedKey = await this.pgpService.encryptAsymmetric(
+      this.privateKey,
+      [this.publicKey as PGPPublicKey],
+      key
+    );
+
+    return { encryptedKey };
+  };
+
+  decryptFileOnOneGo = async (encryptedKey: string, encryptedFile: File) => {
+    const key = await this.pgpService.decryptAsymmetric(
+      this.privateKey as PGPPrivateKey,
+      [this.publicKey as PGPPublicKey],
+      encryptedKey
+    );
+
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+      const file = e.target?.result as string;
+      const decoded = atob(file);
+      const decrypted = await this.cryptoService.decryptFile(key, decoded);
+      const anchor = document.createElement("a");
+      anchor.href = decrypted;
+      anchor.download = "dec." + encryptedFile.name.replace(".enc", "");
+      anchor.click();
+    };
+
+    reader.readAsText(encryptedFile);
+
+    return {};
+  };
+
+  private encryptedChunkSeparator = "CHUNK_END";
+  encryptFile = async (file: File) => {
+    const key = await this.pgpService.generateShareKey(
+      this.publicKey as PGPPublicKey
+    );
+    const encryptedKey = await this.pgpService.encryptAsymmetric(
+      this.privateKey,
+      [this.publicKey as PGPPublicKey],
+      key
+    );
+
+    const encryptedChunks: string[] = [];
+
+    const fileEncryptor = new FileEncryption(file);
+    await fileEncryptor.readInChunks("data-url", async (chunk: string) => {
+      const encChunk = await this.cryptoService.encryptFile(key, chunk);
+      encryptedChunks.push(encChunk);
+    });
+    await fileEncryptor.saveEncryptedChunkedFile(
+      file.name + ".enc",
+      encryptedChunks,
+      this.encryptedChunkSeparator
+    );
+
+    return { encryptedKey };
+  };
+
+  decryptFile = async (encryptedKey: string, encryptedFile: File) => {
+    const key = await this.pgpService.decryptAsymmetric(
+      this.privateKey as PGPPrivateKey,
+      [this.publicKey as PGPPublicKey],
+      encryptedKey
+    );
+
+    const decryptedChunks: string[] = [];
+
+    const fileEncryptor = new FileEncryption(encryptedFile);
+    await fileEncryptor.readEncryptedInChunks(
+      "text",
+      this.encryptedChunkSeparator,
+      async (encChunk: string) => {
+        const chunk = await this.cryptoService.decryptFile(key, encChunk);
+        decryptedChunks.push(chunk);
+      }
+    );
+    await fileEncryptor.saveChunkedFile(
+      "dec." + encryptedFile.name.replace(".enc", ""),
+      decryptedChunks,
+      ""
+    );
+  };
 }

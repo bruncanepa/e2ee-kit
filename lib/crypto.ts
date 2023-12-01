@@ -1,6 +1,7 @@
+import { compress, decompress } from "./compression";
 import {
-  arrayToHexString,
-  hexStringToArray,
+  base64StringToUint8Array,
+  uint8ArrayToBase64String,
   mergeUint8Arrays,
   stringToUint8Array,
   uint8ArrayToString,
@@ -18,7 +19,7 @@ export class CryptoService {
     (key: string): Promise<CryptoKey> =>
       crypto.subtle.importKey(
         "raw",
-        hexStringToArray(key),
+        base64StringToUint8Array(key),
         this.encryptionAlgorithm,
         true,
         ["decrypt", "encrypt"]
@@ -30,15 +31,24 @@ export class CryptoService {
 
   encrypt = tryCatch(
     "crypto.encrypt",
-    async (key: string, data: string): Promise<string> => {
+    async (
+      key: string,
+      data: string,
+      config: EncryptConfig = { compression: false }
+    ): Promise<string> => {
       const iv = this.createRandomValue(this.aesIVLength);
       const keyObj = await this.importSymmetricKey(key);
+
+      const dataBuf = config.compression
+        ? compress(data)
+        : stringToUint8Array(data);
+
       const encryptedData = await crypto.subtle.encrypt(
         { name: this.encryptionAlgorithm, iv },
         keyObj,
-        stringToUint8Array(data)
+        dataBuf
       );
-      return arrayToHexString(
+      return uint8ArrayToBase64String(
         mergeUint8Arrays(iv, new Uint8Array(encryptedData))
       );
     }
@@ -46,8 +56,12 @@ export class CryptoService {
 
   decrypt = tryCatch(
     "crypto.decrypt",
-    async (key: string, encryptedData: string): Promise<string> => {
-      const encryptedBuffer = hexStringToArray(encryptedData);
+    async (
+      key: string,
+      encryptedData: string,
+      config: EncryptConfig = { compression: false }
+    ): Promise<string> => {
+      const encryptedBuffer = base64StringToUint8Array(encryptedData);
       const iv = encryptedBuffer.slice(0, this.aesIVLength);
       const cipher = encryptedBuffer.slice(
         this.aesIVLength,
@@ -59,7 +73,34 @@ export class CryptoService {
         keyObj,
         cipher
       );
-      return uint8ArrayToString(new Uint8Array(decryptedData));
+      let decryptedBuffer = new Uint8Array(decryptedData);
+      if (config.compression) decryptedBuffer = decompress(decryptedBuffer);
+      return uint8ArrayToString(decryptedBuffer);
     }
   );
+
+  encryptFile = (key: string, data: string) =>
+    this.encrypt(key, data, { compression: true });
+
+  decryptFile = (key: string, data: string) =>
+    this.decrypt(key, data, { compression: true });
+
+  /**
+   * Hash with sha256 a message
+   * @param message data to hash
+   * @returns sha256 hash base64 encoded
+   */
+  sha256 = async (message: string) => {
+    if (!message) {
+      return "";
+    }
+    const msgUint8 = new TextEncoder().encode(message); // encode as (utf-8) Uint8Array
+    const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8); // hash the message
+    const hashBase64 = uint8ArrayToBase64String(new Uint8Array(hashBuffer)); // convert buffer to base64
+    return hashBase64;
+  };
+}
+
+interface EncryptConfig {
+  compression: boolean;
 }

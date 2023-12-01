@@ -1,8 +1,8 @@
 import * as openpgp from "openpgp";
 import { tryCatch } from "./error";
-import { arrayToHexString } from "./encoding.utils";
+import { uint8ArrayToBase64String } from "./encoding.utils";
 
-openpgp.config.preferredSymmetricAlgorithm = 9; // set default to aes256
+openpgp.config.preferredSymmetricAlgorithm = openpgp.enums.symmetric.aes256; // set default to AES256
 
 export class PGPPrivateKey extends openpgp.PrivateKey {}
 export class PGPPublicKey extends openpgp.PublicKey {}
@@ -26,7 +26,7 @@ export class PGPService {
       const shareKey = await openpgp.generateSessionKey({
         encryptionKeys: publicKey,
       });
-      return arrayToHexString(shareKey.data);
+      return uint8ArrayToBase64String(shareKey.data);
     }
   );
 
@@ -92,11 +92,20 @@ export class PGPService {
 
   encrypt = tryCatch(
     "pgp.encrypt",
-    async (key: string, data: string): Promise<string> => {
+    async (
+      key: string,
+      data: string,
+      config: EncryptConfig = { compression: false }
+    ): Promise<string> => {
       const message = await openpgp.createMessage({ text: data });
       const encrypted = await openpgp.encrypt({
         message,
         passwords: key,
+        config: {
+          preferredCompressionAlgorithm: config.compression
+            ? openpgp.enums.compression.zlib
+            : openpgp.enums.compression.uncompressed,
+        },
       });
       return encrypted as string;
     }
@@ -110,4 +119,8 @@ export class PGPService {
       return decrypted.data as string;
     }
   );
+}
+
+export interface EncryptConfig {
+  compression: boolean;
 }
