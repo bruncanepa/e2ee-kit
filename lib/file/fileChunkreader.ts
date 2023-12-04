@@ -1,11 +1,11 @@
 import { CryptoService } from "../crypto";
-import { mbToBytes } from "../fileSizeUtils";
+import { kbToBytes, mbToBytes } from "../fileSizeUtils";
 
 export const FOLDER_PAGE_SIZE = 150;
 export const BATCH_REQUEST_SIZE = 50;
-export const FILE_CHUNK_SIZE = mbToBytes(5);
+export const FILE_CHUNK_SIZE = mbToBytes(5); // kbToBytes(1); //;
 
-type ReadAs = "binary" | "text" | "data-url";
+type ReadAs = "text" | "data-url";
 
 // export const MEMORY_DOWNLOAD_LIMIT = (isMobile() ? 100 : 500) * MB;
 export class FileEncryption {
@@ -33,10 +33,16 @@ export class FileEncryption {
             e.target?.error || new Error("Cannot open file for reading")
           );
         }
-
         const result = e.target.result as string;
         this.offset += this.chunkSize;
         resolve(result);
+      };
+
+      fileReader.onprogress = (event) => {
+        if (event.loaded && event.total) {
+          const percent = (event.loaded / event.total) * 100;
+          console.log(`Progress: ${Math.round(percent)}`);
+        }
       };
 
       this.readAs(readAs, fileReader, blob);
@@ -52,11 +58,18 @@ export class FileEncryption {
 
   private buffer = "";
 
-  async nextEncrypted(readAs: ReadAs, separator: string): Promise<string> {
+  async nextEncrypted(
+    readAs: ReadAs,
+    separator: string,
+    firstChunk: boolean
+  ): Promise<string> {
     while (!this.buffer.includes(separator)) {
-      const next = await this.next(readAs);
-      this.buffer += atob(next);
-      if (!next) {
+      let next = await this.next(readAs);
+      if (readAs === "data-url") {
+        next = next.replace("data:application/octet-stream;base64,", "");
+      }
+      this.buffer += next.length ? atob(next) : next;
+      if (!next.length) {
         break;
       }
     }
@@ -77,15 +90,24 @@ export class FileEncryption {
     separator: string,
     fn: (encryptedChunk: string) => any
   ) {
+    let firstChunk = true;
     while (!this.isEOF()) {
-      const chunk = await this.nextEncrypted(readAs, separator);
+      const chunk = await this.nextEncrypted(readAs, separator, firstChunk);
+      firstChunk = false;
       await fn(chunk);
     }
   }
 
   saveChunkedFile = (name: string, chunks: string[], separator: string) => {
     const anchor = document.createElement("a");
-    anchor.href = chunks.join(separator);
+    anchor.href =
+      "data:application/octet-stream;base64," +
+      btoa(
+        chunks
+          .map((c) => c.replace("data:application/octet-stream;base64,", ""))
+          .map((c) => atob(c))
+          .join("")
+      );
     anchor.download = name;
     anchor.click();
 
@@ -115,8 +137,7 @@ export class FileEncryption {
     const anchor = document.createElement("a");
     anchor.download = name;
     anchor.target = "_blank";
-    anchor.href =
-      "data:application/octet-stream," + btoa(chunks.join(separator));
+    anchor.href = "data:application/octet-stream," + chunks.join(separator);
     anchor.click();
     URL.revokeObjectURL(anchor.href);
 
@@ -158,8 +179,6 @@ export class FileEncryption {
       case "data-url":
         fileReader.readAsDataURL(blob);
         break;
-      default:
-        fileReader.readAsBinaryString(blob);
     }
   }
 }

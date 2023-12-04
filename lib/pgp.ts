@@ -119,6 +119,11 @@ export class PGPService {
       return decrypted.data as string;
     }
   );
+
+  encryptFile = (key: string, data: string) =>
+    this.encrypt(key, data, { compression: true });
+
+  decryptFile = (key: string, data: string) => this.decrypt(key, data);
 }
 
 export interface EncryptConfig {

@@ -12,6 +12,7 @@ const { crypto } = globalThis;
 
 export class CryptoService {
   private aesIVLength = 12;
+  private aesKeyLength = 32;
   private encryptionAlgorithm = "AES-GCM";
 
   private importSymmetricKey = tryCatch(
@@ -26,8 +27,29 @@ export class CryptoService {
       )
   );
 
-  private createRandomValue = (len: number): Uint8Array =>
-    crypto.getRandomValues(new Uint8Array(len));
+  /**
+   * Retrieve secure random byte array of the specified length
+   * @param {Integer} len length in bytes to generate
+   * @returns {Uint8Array} random byte array.
+   */
+  private createRandomValue = (len: number): Uint8Array => {
+    const buf = new Uint8Array(len);
+    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+      return crypto.getRandomValues(buf);
+    } else {
+      const nodeCrypto = require("crypto");
+      if (nodeCrypto) {
+        const bytes = nodeCrypto.randomBytes(buf.length);
+        buf.set(bytes);
+      } else {
+        throw new Error("No secure random number generator available.");
+      }
+    }
+    return buf;
+  };
+
+  generateSymmetricKey = (): string =>
+    uint8ArrayToBase64String(this.createRandomValue(this.aesKeyLength));
 
   encrypt = tryCatch(
     "crypto.encrypt",
