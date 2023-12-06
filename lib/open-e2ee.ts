@@ -95,19 +95,26 @@ export class OpenE2EE {
    * @param data value to encrypt
    * @returns encrypted message with key and data.
    */
-  encrypt = async (data: string): Promise<EncryptItemOut> => {
+  encrypt = async (
+    data: string,
+    sign: boolean = true
+  ): Promise<EncryptItemOut> => {
     if (this.getFeature("share")) {
       const { shareKey, encryptedShareKey } = await PGP.generateShareKey(
         this.publicKey
       );
-      const encryptedData = await PGP.encrypt(this.privateKey, shareKey, data);
+      const encryptedData = await PGP.encrypt(
+        sign ? this.privateKey : undefined,
+        shareKey,
+        data
+      );
       return {
         shareKey,
         encryptedMessage: writeEncryptedItem(encryptedShareKey, encryptedData),
       };
     }
     const encryptedMessage = await PGP.encryptAsymmetric(
-      this.privateKey,
+      sign ? this.privateKey : undefined,
       [this.publicKey],
       data
     );
@@ -331,4 +338,4 @@ function insertAfterEachItem(
   return newArray;
 }
 
-type Feature = "share" | "files";
+export type Feature = "share" | "files";

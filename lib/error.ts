@@ -2,11 +2,9 @@ const wrapError = (message: string, error: Error): Error => {
   if (!error) {
     return new Error(message);
   }
-
   try {
     error.message = `${message}: ${error.message}`;
   } catch (e) {}
-
   return error;
 };
 

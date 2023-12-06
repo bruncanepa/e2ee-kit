@@ -16,8 +16,8 @@ Inspired by [ProtonMail](https://proton.me/blog/encrypted-email) and [ProtonCale
 
 - Create PGP key pair.
 - Export PGP key pair (private key encrypted).
-- Create AES-256 keys and encrypt them with your PGP private key.
-- Encrypt and decrypt any string using AES-256.
+- Create AES-256 keys and encrypt them with PGP public key and sign them with PGP private key.
+- Encrypt and decrypt any string using AES-256-GCM.
 - Share and receive data encrypted with other's PGP public key and signed with your PGP private key.
 - File encryption, using a 32-bytes key with AES-256 to encrypt every file chunk and using PGP public key to encrypt the key.
 

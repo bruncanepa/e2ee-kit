@@ -27,11 +27,6 @@ export class Crypto {
       )
   );
 
-  /**
-   * Retrieve secure random byte array of the specified length
-   * @param {Integer} len length in bytes to generate
-   * @returns {Uint8Array} random byte array.
-   */
   private static createRandomValue = (len: number): Uint8Array => {
     const buf = new Uint8Array(len);
     if (typeof crypto !== "undefined" && crypto.getRandomValues) {
