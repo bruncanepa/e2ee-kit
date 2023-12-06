@@ -1,6 +1,6 @@
 import {
-  arrayToHexString,
-  hexStringToArray,
+  base64StringToUint8Array,
+  uint8ArrayToBase64String,
   mergeUint8Arrays,
   stringToUint8Array,
   uint8ArrayToString,
@@ -9,45 +9,63 @@ import { tryCatch } from "./error";
 
 const { crypto } = globalThis;
 
-export class CryptoService {
-  private aesIVLength = 12;
-  private encryptionAlgorithm = "AES-GCM";
+export class Crypto {
+  private static aesIVLength = 12;
+  private static aesKeyLength = 32;
+  private static encryptionAlgorithm = "AES-GCM";
 
-  private importSymmetricKey = tryCatch(
+  private static importSymmetricKey = tryCatch(
     "crypto.importSymmetricKey",
     (key: string): Promise<CryptoKey> =>
       crypto.subtle.importKey(
         "raw",
-        hexStringToArray(key),
+        base64StringToUint8Array(key),
         this.encryptionAlgorithm,
         true,
         ["decrypt", "encrypt"]
       )
   );
 
-  private createRandomValue = (len: number): Uint8Array =>
-    crypto.getRandomValues(new Uint8Array(len));
+  private static createRandomValue = (len: number): Uint8Array => {
+    const buf = new Uint8Array(len);
+    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+      return crypto.getRandomValues(buf);
+    } else {
+      const nodeCrypto = require("crypto");
+      if (nodeCrypto) {
+        const bytes = nodeCrypto.randomBytes(buf.length);
+        buf.set(bytes);
+      } else {
+        throw new Error("No secure random number generator available.");
+      }
+    }
+    return buf;
+  };
 
-  encrypt = tryCatch(
+  static generateSymmetricKey = (): string =>
+    uint8ArrayToBase64String(this.createRandomValue(this.aesKeyLength));
+
+  static encrypt = tryCatch(
     "crypto.encrypt",
     async (key: string, data: string): Promise<string> => {
       const iv = this.createRandomValue(this.aesIVLength);
       const keyObj = await this.importSymmetricKey(key);
+      const dataBuf = stringToUint8Array(data);
       const encryptedData = await crypto.subtle.encrypt(
         { name: this.encryptionAlgorithm, iv },
         keyObj,
-        stringToUint8Array(data)
+        dataBuf
       );
-      return arrayToHexString(
+      return uint8ArrayToBase64String(
         mergeUint8Arrays(iv, new Uint8Array(encryptedData))
       );
     }
   );
 
-  decrypt = tryCatch(
+  static decrypt = tryCatch(
     "crypto.decrypt",
     async (key: string, encryptedData: string): Promise<string> => {
-      const encryptedBuffer = hexStringToArray(encryptedData);
+      const encryptedBuffer = base64StringToUint8Array(encryptedData);
       const iv = encryptedBuffer.slice(0, this.aesIVLength);
       const cipher = encryptedBuffer.slice(
         this.aesIVLength,
@@ -62,4 +80,11 @@ export class CryptoService {
       return uint8ArrayToString(new Uint8Array(decryptedData));
     }
   );
+
+  static digest = tryCatch("crypto.digest", async (message: string) => {
+    if (!message) return "";
+    const msgUint8 = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
+    return uint8ArrayToBase64String(new Uint8Array(hashBuffer));
+  });
 }

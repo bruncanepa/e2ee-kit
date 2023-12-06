@@ -1,14 +1,14 @@
 import * as openpgp from "openpgp";
 import { tryCatch } from "./error";
-import { arrayToHexString } from "./encoding.utils";
+import { uint8ArrayToBase64String } from "./encoding.utils";
 
-openpgp.config.preferredSymmetricAlgorithm = 9; // set default to aes256
+openpgp.config.preferredSymmetricAlgorithm = openpgp.enums.symmetric.aes256; // set default to AES256
 
-export class PGPPrivateKey extends openpgp.PrivateKey {}
-export class PGPPublicKey extends openpgp.PublicKey {}
+export type PGPPrivateKey = openpgp.PrivateKey | undefined;
+export type PGPPublicKey = openpgp.PublicKey | undefined;
 
-export class PGPService {
-  generateKeyPair = tryCatch(
+export class PGP {
+  static generateKeyPair = tryCatch(
     "pgp.generateKeyPair",
     async (passphrase: string, userId: string) =>
       await openpgp.generateKey({
@@ -20,23 +20,46 @@ export class PGPService {
       })
   );
 
-  generateShareKey = tryCatch(
+  static generateShareKey = tryCatch(
     "pgp.generateShareKey",
-    async (publicKey: PGPPublicKey): Promise<string> => {
+    async (encryptionKeys: PGPPublicKey | PGPPublicKey[]) => {
       const shareKey = await openpgp.generateSessionKey({
-        encryptionKeys: publicKey,
+        encryptionKeys: encryptionKeys as openpgp.PublicKey[],
       });
-      return arrayToHexString(shareKey.data);
+      const encryptedShareKey = await openpgp.encryptSessionKey({
+        ...shareKey,
+        encryptionKeys: encryptionKeys as openpgp.PublicKey[],
+      });
+      return {
+        shareKey: uint8ArrayToBase64String(shareKey.data),
+        encryptedShareKey,
+      };
     }
   );
 
-  readPublicKey = tryCatch(
+  static decryptShareKey = tryCatch(
+    "pgp.decryptShareKey",
+    async (
+      decryptionKey: PGPPrivateKey,
+      encryptedShareKey: string
+    ): Promise<string> => {
+      const [shareKey] = await openpgp.decryptSessionKeys({
+        message: await openpgp.readMessage({
+          armoredMessage: encryptedShareKey,
+        }),
+        decryptionKeys: decryptionKey,
+      });
+      return uint8ArrayToBase64String(shareKey.data);
+    }
+  );
+
+  static readPublicKey = tryCatch(
     "pgp.readPublicKey",
-    async (publicKeyArmored: string) =>
+    async (publicKeyArmored: string): Promise<PGPPublicKey> =>
       (await openpgp.readKey({ armoredKey: publicKeyArmored })) as PGPPublicKey
   );
 
-  readPrivateKey = tryCatch(
+  static readPrivateKey = tryCatch(
     "pgp.readPrivateKey",
     async (privateKeyArmored: string) =>
       (await openpgp.readPrivateKey({
@@ -44,35 +67,35 @@ export class PGPService {
       })) as PGPPrivateKey
   );
 
-  decryptPrivateKey = tryCatch(
+  static decryptPrivateKey = tryCatch(
     "pgp.decryptPrivateKey",
     async (privateKeyArmored: string, passphrase: string) => {
       const privateKey = await this.readPrivateKey(privateKeyArmored);
       return (await openpgp.decryptKey({
-        privateKey,
+        privateKey: privateKey as openpgp.PrivateKey,
         passphrase,
       })) as PGPPrivateKey;
     }
   );
 
-  encryptAsymmetric = tryCatch(
+  static encryptAsymmetric = tryCatch(
     "pgp.encryptAsymmetric",
     async (
-      privateKey: PGPPrivateKey | undefined,
+      signingKey: PGPPrivateKey,
       encryptionKeys: PGPPublicKey[],
       data: string
     ): Promise<string> => {
       const message = await openpgp.createMessage({ text: data });
       const encrypted = await openpgp.encrypt({
         message,
-        encryptionKeys,
-        signingKeys: privateKey,
+        encryptionKeys: encryptionKeys as openpgp.PublicKey[],
+        signingKeys: signingKey,
       });
       return encrypted as string;
     }
   );
 
-  decryptAsymmetric = tryCatch(
+  static decryptAsymmetric = tryCatch(
     "pgp.decryptAsymmetric",
     async (
       privateKey: PGPPrivateKey,
@@ -82,7 +105,7 @@ export class PGPService {
       const message = await openpgp.readMessage({ armoredMessage: data });
       const decrypted = await openpgp.decrypt({
         message,
-        verificationKeys: verificationKeys,
+        verificationKeys: verificationKeys as openpgp.PublicKey[],
         decryptionKeys: privateKey,
         expectSigned: true,
       });
@@ -90,23 +113,37 @@ export class PGPService {
     }
   );
 
-  encrypt = tryCatch(
+  static encrypt = tryCatch(
     "pgp.encrypt",
-    async (key: string, data: string): Promise<string> => {
+    async (
+      signingKey: PGPPrivateKey,
+      key: string,
+      data: string
+    ): Promise<string> => {
       const message = await openpgp.createMessage({ text: data });
       const encrypted = await openpgp.encrypt({
         message,
         passwords: key,
+        signingKeys: signingKey,
       });
       return encrypted as string;
     }
   );
 
-  decrypt = tryCatch(
+  static decrypt = tryCatch(
     "pgp.decrypt",
-    async (key: string, data: string): Promise<string> => {
+    async (
+      key: string,
+      data: string,
+      verificationKeys?: PGPPublicKey[]
+    ): Promise<string> => {
       const message = await openpgp.readMessage({ armoredMessage: data });
-      const decrypted = await openpgp.decrypt({ message, passwords: key });
+      const decrypted = await openpgp.decrypt({
+        message,
+        passwords: key,
+        verificationKeys: verificationKeys as openpgp.PublicKey[],
+        expectSigned: Boolean(verificationKeys?.length),
+      });
       return decrypted.data as string;
     }
   );
