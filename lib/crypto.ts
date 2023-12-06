@@ -1,4 +1,4 @@
-import { compress, decompress } from "./compression";
+import { compress, compressString, decompress } from "./compression";
 import {
   base64StringToUint8Array,
   uint8ArrayToBase64String,
@@ -10,12 +10,12 @@ import { tryCatch } from "./error";
 
 const { crypto } = globalThis;
 
-export class CryptoService {
-  private aesIVLength = 12;
-  private aesKeyLength = 32;
-  private encryptionAlgorithm = "AES-GCM";
+export class Crypto {
+  private static aesIVLength = 12;
+  private static aesKeyLength = 32;
+  private static encryptionAlgorithm = "AES-GCM";
 
-  private importSymmetricKey = tryCatch(
+  private static importSymmetricKey = tryCatch(
     "crypto.importSymmetricKey",
     (key: string): Promise<CryptoKey> =>
       crypto.subtle.importKey(
@@ -32,7 +32,7 @@ export class CryptoService {
    * @param {Integer} len length in bytes to generate
    * @returns {Uint8Array} random byte array.
    */
-  private createRandomValue = (len: number): Uint8Array => {
+  private static createRandomValue = (len: number): Uint8Array => {
     const buf = new Uint8Array(len);
     if (typeof crypto !== "undefined" && crypto.getRandomValues) {
       return crypto.getRandomValues(buf);
@@ -48,10 +48,10 @@ export class CryptoService {
     return buf;
   };
 
-  generateSymmetricKey = (): string =>
+  static generateSymmetricKey = (): string =>
     uint8ArrayToBase64String(this.createRandomValue(this.aesKeyLength));
 
-  encrypt = tryCatch(
+  static encrypt = tryCatch(
     "crypto.encrypt",
     async (
       key: string,
@@ -62,7 +62,7 @@ export class CryptoService {
       const keyObj = await this.importSymmetricKey(key);
 
       const dataBuf = config.compression
-        ? compress(data)
+        ? compressString(data)
         : stringToUint8Array(data);
 
       const encryptedData = await crypto.subtle.encrypt(
@@ -76,7 +76,7 @@ export class CryptoService {
     }
   );
 
-  decrypt = tryCatch(
+  static decrypt = tryCatch(
     "crypto.decrypt",
     async (
       key: string,
@@ -101,26 +101,50 @@ export class CryptoService {
     }
   );
 
-  encryptFile = (key: string, data: string) =>
-    this.encrypt(key, data, { compression: true });
+  static encryptFile = tryCatch(
+    "crypto.encryptFile",
+    async (key: string, data: Uint8Array): Promise<Uint8Array> => {
+      const iv = this.createRandomValue(this.aesIVLength);
+      const keyObj = await this.importSymmetricKey(key);
 
-  decryptFile = (key: string, data: string) =>
-    this.decrypt(key, data, { compression: true });
+      const dataBuf = compress(data);
 
-  /**
-   * Hash with sha256 a message
-   * @param message data to hash
-   * @returns sha256 hash base64 encoded
-   */
-  sha256 = async (message: string) => {
+      const encryptedData = await crypto.subtle.encrypt(
+        { name: this.encryptionAlgorithm, iv },
+        keyObj,
+        dataBuf
+      );
+      return mergeUint8Arrays(iv, new Uint8Array(encryptedData));
+    }
+  );
+
+  static decryptFile = tryCatch(
+    "crypto.decryptFile",
+    async (key: string, encryptedData: string): Promise<Uint8Array> => {
+      const encryptedBuffer = stringToUint8Array(encryptedData);
+      const iv = encryptedBuffer.slice(0, this.aesIVLength);
+      const cipher = encryptedBuffer.slice(
+        this.aesIVLength,
+        encryptedBuffer.length
+      );
+      const keyObj = await this.importSymmetricKey(key);
+      const decryptedData = await crypto.subtle.decrypt(
+        { name: this.encryptionAlgorithm, iv },
+        keyObj,
+        cipher
+      );
+      return decompress(new Uint8Array(decryptedData));
+    }
+  );
+
+  static digest = tryCatch("crypto.digest", async (message: string) => {
     if (!message) {
       return "";
     }
-    const msgUint8 = new TextEncoder().encode(message); // encode as (utf-8) Uint8Array
-    const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8); // hash the message
-    const hashBase64 = uint8ArrayToBase64String(new Uint8Array(hashBuffer)); // convert buffer to base64
-    return hashBase64;
-  };
+    const msgUint8 = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
+    return uint8ArrayToBase64String(new Uint8Array(hashBuffer));
+  });
 }
 
 interface EncryptConfig {

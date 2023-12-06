@@ -1,12 +1,14 @@
-export class OpenE2EEError extends Error {
-  constructor(method: string, error: Error) {
-    const message = `${method}: ${error.message}`;
-    super(message);
-    this.message = message;
-    this.name = error.name;
-    this.stack = error.stack;
+const wrapError = (message: string, error: Error): Error => {
+  if (!error) {
+    return new Error(message);
   }
-}
+
+  try {
+    error.message = `${message}: ${error.message}`;
+  } catch (e) {}
+
+  return error;
+};
 
 /**
  * Generic function that accepts any number of parameters.
@@ -35,7 +37,7 @@ export function tryCatch<F extends GenericFunction>(
     try {
       return await func(...args);
     } catch (error) {
-      throw new OpenE2EEError(method, error as Error);
+      throw wrapError(method, error as Error);
     }
   };
 }

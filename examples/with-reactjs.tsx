@@ -1,11 +1,37 @@
 "use client";
-import React, { useState, useMemo, useEffect } from "react";
-import { OpenE2EE } from "../../../lib/open-e2ee";
+import React, { useState, useMemo, useEffect, ChangeEvent } from "react";
+import { OpenE2EE } from "../lib/open-e2ee";
 
 const userID = "2997e638-b01b-446f-be33-df9ec8b4f206";
-export function OpenE2EEExample() {
+
+export default function Examples() {
+  const [page, setPage] = useState<"text" | "files">("files");
+  return (
+    <main style={{ width: "80%" }}>
+      <nav
+        style={{
+          display: "flex",
+          justifyContent: "space-around",
+          borderBottom: "1px solid",
+        }}
+      >
+        <a onClick={() => setPage("text")}>Text</a>
+        <a onClick={() => setPage("files")}>Files</a>
+      </nav>
+      <br />
+      <br />
+      {page === "text" && <TextExample />}
+      {page === "files" && <FilesPage />}
+    </main>
+  );
+}
+
+function TextExample() {
   const [passphrase, setPassphrase] = useState("passphrase-long-super-long");
-  const etoeeSvc = useMemo(() => new OpenE2EE(userID, passphrase), []);
+  const etoeeSvc = useMemo(
+    () => new OpenE2EE(userID, passphrase, ["share"]),
+    []
+  );
 
   const [data, setData] = useState("data super secret to encrypt");
   const [encrypted, setEncrypted] = useState<string>("");
@@ -34,7 +60,7 @@ export function OpenE2EEExample() {
   };
 
   const onLoadPGPPrivateKey = async () => {
-    const svcLoaded = await new OpenE2EE(userID, passphrase).load(
+    const svcLoaded = await new OpenE2EE(userID, passphrase, ["share"]).load(
       privateKey,
       publicKey
     );
@@ -46,7 +72,9 @@ export function OpenE2EEExample() {
   };
 
   const onShare = async () => {
-    const receiverSvc = await new OpenE2EE(userID + 1, passphrase + 1).build();
+    const receiverSvc = await new OpenE2EE(userID + 1, passphrase + 1, [
+      "share",
+    ]).build();
     const { publicKey: receiverPublicKey } =
       await receiverSvc.exportMasterKeys();
 
@@ -131,3 +159,56 @@ export function OpenE2EEExample() {
     </main>
   );
 }
+
+const FilesPage = () => {
+  const [passphrase] = useState("passphrase-long-super-long");
+  const openE2EESvc = useMemo(
+    () => new OpenE2EE(userID, passphrase),
+    [passphrase]
+  );
+  const [encryptKey, setEncryptKey] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      await openE2EESvc.build();
+      console.log("open-e2ee built");
+    })();
+  }, []);
+
+  const onEncryptFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = (e.target as HTMLInputElement).files;
+    if (!files?.length) return console.log("no files selected");
+    const { encryptedKey } = await openE2EESvc.encryptFile(files[0]);
+    setEncryptKey(encryptedKey);
+  };
+
+  const onDecryptFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = (e.target as HTMLInputElement).files;
+    if (!files?.length) return console.log("no files selected");
+    await openE2EESvc.decryptFile(encryptKey, files[0]);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <label htmlFor="encrypt">Encrypt file:</label>
+      <input
+        type="file"
+        id="encrypt"
+        name="encrypt"
+        // accept="image/png, image/jpeg"
+        onChange={onEncryptFile}
+      />
+      <br />
+      <br />
+      <br />
+      <label htmlFor="decrypt">Decrypt file:</label>
+      <input
+        type="file"
+        id="decrypt"
+        name="decrypt"
+        accept="enc"
+        onChange={onDecryptFile}
+      />
+    </div>
+  );
+};
