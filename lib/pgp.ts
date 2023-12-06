@@ -118,13 +118,19 @@ export class PGP {
     async (
       signingKey: PGPPrivateKey,
       key: string,
-      data: string
+      data: string,
+      config: EncryptConfig = { compression: false }
     ): Promise<string> => {
       const message = await openpgp.createMessage({ text: data });
       const encrypted = await openpgp.encrypt({
         message,
         passwords: key,
         signingKeys: signingKey,
+        config: {
+          preferredCompressionAlgorithm: config.compression
+            ? openpgp.enums.compression.zlib
+            : openpgp.enums.compression.uncompressed,
+        },
       });
       return encrypted as string;
     }
@@ -147,4 +153,13 @@ export class PGP {
       return decrypted.data as string;
     }
   );
+
+  static encryptFile = (key: string, data: string) =>
+    this.encrypt(undefined, key, data, { compression: true });
+
+  static decryptFile = (key: string, data: string) => this.decrypt(key, data);
+}
+
+export interface EncryptConfig {
+  compression: boolean;
 }

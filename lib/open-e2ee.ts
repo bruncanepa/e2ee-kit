@@ -8,6 +8,12 @@ import {
   EncryptItemOut,
 } from "./models";
 import { PGPPrivateKey, PGPPublicKey, PGP } from "./pgp";
+import { FileEncryption } from "./file/fileChunkreader";
+import {
+  base64StringToUint8Array,
+  stringToUint8Array,
+  uint8ArrayToBase64String,
+} from "./encoding.utils";
 
 export class OpenE2EE {
   private passphrase: string;
@@ -240,6 +246,62 @@ export class OpenE2EE {
     return { shareKey, data };
   };
 
+  private encryptedChunkSeparator = "_ENDCHUNK_";
+  encryptFile = async (file: File) => {
+    this.needsFeatures("files");
+
+    const { shareKey, encryptedShareKey } = await PGP.generateShareKey(
+      this.publicKey
+    );
+
+    let encryptedChunks: Uint8Array[] = [];
+
+    const fileEncryptor = new FileEncryption(file);
+    await fileEncryptor.readInChunks("buffer", async (chunk: Uint8Array) => {
+      const encChunk = await PGP.encryptFile(
+        shareKey,
+        uint8ArrayToBase64String(chunk)
+      );
+      encryptedChunks.push(base64StringToUint8Array(encChunk));
+    });
+
+    encryptedChunks = insertAfterEachItem(
+      encryptedChunks,
+      this.encryptedChunkSeparator
+    );
+
+    await fileEncryptor.saveEncryptedChunkedFile(
+      file.name + ".enc",
+      new Blob(encryptedChunks, { type: file.type }),
+      this.encryptedChunkSeparator
+    );
+
+    return { encryptedKey: encryptedShareKey };
+  };
+
+  decryptFile = async (encryptedKey: string, encryptedFile: File) => {
+    this.needsFeatures("files");
+
+    const shareKey = await PGP.decryptShareKey(this.privateKey, encryptedKey);
+
+    const decryptedChunks: Uint8Array[] = [];
+
+    const fileEncryptor = new FileEncryption(encryptedFile);
+    await fileEncryptor.readEncryptedInChunks(
+      "buffer",
+      this.encryptedChunkSeparator,
+      async (encChunk: string) => {
+        const chunk = await PGP.decryptFile(shareKey, encChunk);
+        decryptedChunks.push(stringToUint8Array(chunk));
+      }
+    );
+    await fileEncryptor.saveChunkedFile(
+      "dec." + encryptedFile.name.replace(".enc", ""),
+      new Blob(decryptedChunks, { type: encryptedFile.type }),
+      ""
+    );
+  };
+
   private needsFeatures = (neededFeatures: Feature[] | Feature) => {
     if (typeof neededFeatures === "string") {
       neededFeatures = [neededFeatures];
@@ -251,7 +313,29 @@ export class OpenE2EE {
       throw Error(`${neededFeatures.join(",")} features need to be enabled`);
     }
   };
-  private getFeature = (feature: Feature) => this.features.includes(feature);
+  private getFeature = (feature: Feature) =>
+    this.features.find((f) => f === feature);
+}
+
+function insertAfterEachItem(
+  originalArray: Uint8Array[],
+  itemToInsert: string
+) {
+  // Create a new array to store the modified items
+  const newArray: Uint8Array[] = [];
+
+  // Iterate through the original array
+  originalArray.forEach((item, index) => {
+    // Add the current item
+    newArray.push(item);
+
+    // Add the item to insert after each actual item (except the last one)
+    if (index < originalArray.length - 1) {
+      newArray.push(stringToUint8Array(itemToInsert));
+    }
+  });
+
+  return newArray;
 }
 
 export type Feature = "share" | "files";

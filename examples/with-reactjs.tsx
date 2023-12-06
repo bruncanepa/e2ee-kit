@@ -5,7 +5,7 @@ import { OpenE2EE } from "../lib/open-e2ee";
 const userID = "2997e638-b01b-446f-be33-df9ec8b4f206";
 
 export default function Examples() {
-  const [page, setPage] = useState<"text" | "files">("text");
+  const [page, setPage] = useState<"text" | "files">("files");
   return (
     <main style={{ width: "80%" }}>
       <nav
@@ -16,10 +16,12 @@ export default function Examples() {
         }}
       >
         <a onClick={() => setPage("text")}>Text</a>
+        <a onClick={() => setPage("files")}>Files</a>
       </nav>
       <br />
       <br />
       {page === "text" && <TextExample />}
+      {page === "files" && <FilesPage />}
     </main>
   );
 }
@@ -157,3 +159,56 @@ function TextExample() {
     </main>
   );
 }
+
+const FilesPage = () => {
+  const [passphrase] = useState("passphrase-long-super-long");
+  const openE2EESvc = useMemo(
+    () => new OpenE2EE(userID, passphrase),
+    [passphrase]
+  );
+  const [encryptKey, setEncryptKey] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      await openE2EESvc.build();
+      console.log("open-e2ee built");
+    })();
+  }, []);
+
+  const onEncryptFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = (e.target as HTMLInputElement).files;
+    if (!files?.length) return console.log("no files selected");
+    const { encryptedKey } = await openE2EESvc.encryptFile(files[0]);
+    setEncryptKey(encryptedKey);
+  };
+
+  const onDecryptFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = (e.target as HTMLInputElement).files;
+    if (!files?.length) return console.log("no files selected");
+    await openE2EESvc.decryptFile(encryptKey, files[0]);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <label htmlFor="encrypt">Encrypt file:</label>
+      <input
+        type="file"
+        id="encrypt"
+        name="encrypt"
+        // accept="image/png, image/jpeg"
+        onChange={onEncryptFile}
+      />
+      <br />
+      <br />
+      <br />
+      <label htmlFor="decrypt">Decrypt file:</label>
+      <input
+        type="file"
+        id="decrypt"
+        name="decrypt"
+        accept="enc"
+        onChange={onDecryptFile}
+      />
+    </div>
+  );
+};
