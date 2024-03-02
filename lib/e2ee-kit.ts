@@ -9,7 +9,7 @@ import {
 } from "./models";
 import { PGPPrivateKey, PGPPublicKey, PGP } from "./pgp";
 
-export class OpenE2EE {
+export class E2EEKit {
   private passphrase: string;
   private privateKey: PGPPrivateKey;
   private privateKeyEncryptedText: string = "";
@@ -36,7 +36,7 @@ export class OpenE2EE {
    * Loads data with a new PGP pair.
    * @example const e2eeSvc = await new E2EEService().build(passphrase);
    */
-  build = async (): Promise<OpenE2EE> => {
+  build = async (): Promise<E2EEKit> => {
     const { privateKey, publicKey } = await PGP.generateKeyPair(
       this.passphrase,
       this.userId
@@ -61,7 +61,7 @@ export class OpenE2EE {
   load = async (
     encryptedPrivateKey: string,
     publicKey: string
-  ): Promise<OpenE2EE> => {
+  ): Promise<E2EEKit> => {
     const [privateKeyObj, publicKeyObj] = await Promise.all([
       PGP.decryptPrivateKey(encryptedPrivateKey, this.passphrase),
       PGP.readPublicKey(publicKey),

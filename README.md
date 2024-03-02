@@ -1,6 +1,6 @@
-# Open E2EE
+# E2EE Kit
 
-## Open-source tools to simplify E2EE on the Web
+## Open-source kit to simplify E2EE on the Web
 
 Inspired by [ProtonMail](https://proton.me/blog/encrypted-email) and [ProtonCalendar](https://proton.me/blog/protoncalendar-security-model) privacy and security practices.
 
@@ -52,9 +52,9 @@ Inspired by [ProtonMail](https://proton.me/blog/encrypted-email) and [ProtonCale
 
   // 1. Create instance of service (2 options)
   // A) Create a new PGP pair. Use only once for each user (e.g: on sign up)
-  const etoeeSvc = await new OpenE2EE(userID, passphrase).build();
+  const etoeeSvc = await new E2EEKit(userID, passphrase).build();
   // B) Loads an existing PGP pair. Use when user already has a PGP key pair (e.g: on sign in)
-  const etoeeSvc = await new OpenE2EE(userID, passphrase).load(
+  const etoeeSvc = await new E2EEKit(userID, passphrase).load(
     privateKey,
     publicKey
   );
@@ -71,7 +71,7 @@ Inspired by [ProtonMail](https://proton.me/blog/encrypted-email) and [ProtonCale
   console.log({ key, data });
 
   // 5. Share an E2EE and signed item with another user (receiver)
-  const receiverSvc = await new OpenE2EE(
+  const receiverSvc = await new E2EEKit(
     userID + "other",
     passphrase + "other"
   ).build();

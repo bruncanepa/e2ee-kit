@@ -1,6 +1,6 @@
 import "./mocks";
 import { describe, expect, test, beforeEach } from "@jest/globals";
-import { OpenE2EE, Feature } from "../open-e2ee";
+import { E2EEKit, Feature } from "../open-e2ee";
 import { PGP } from "../pgp";
 import {
   isEncryptedItemFormat,
@@ -17,9 +17,9 @@ const tests = (features: Feature[]) => {
   describe(`open-e2ee module: features ${features.join(",")}`, () => {
     const userID = "2997e638-b01b-446f-be33-df9ec8b4f206";
     const passphrase = "passphrase-long-super-long";
-    let etoeeSvc = new OpenE2EE(userID, passphrase, features);
+    let etoeeSvc = new E2EEKit(userID, passphrase, features);
     beforeEach(async () => {
-      etoeeSvc = await new OpenE2EE(userID, passphrase, features).build();
+      etoeeSvc = await new E2EEKit(userID, passphrase, features).build();
     });
 
     test("build()", async () => {
@@ -37,7 +37,7 @@ const tests = (features: Feature[]) => {
     test("load()", async () => {
       let { privateKey, publicKey } = await etoeeSvc.exportMasterKeys();
 
-      const otherSvc = await new OpenE2EE(userID, passphrase, features).load(
+      const otherSvc = await new E2EEKit(userID, passphrase, features).load(
         privateKey,
         publicKey
       );
@@ -55,7 +55,7 @@ const tests = (features: Feature[]) => {
       let { publicKey } = await etoeeSvc.exportMasterKeys();
 
       await expect(
-        new OpenE2EE(userID, passphrase, features).load(
+        new E2EEKit(userID, passphrase, features).load(
           privateKeyBegin + "\ninvalid private key\n" + privateKeyEnd,
           publicKey
         )
@@ -63,7 +63,7 @@ const tests = (features: Feature[]) => {
     });
 
     test("load(): error invalid private key because encrypted with another passphrase", async () => {
-      const otherSvc = await new OpenE2EE(
+      const otherSvc = await new E2EEKit(
         userID,
         "other passphrase",
         features
@@ -72,7 +72,7 @@ const tests = (features: Feature[]) => {
       let { privateKey: otherPrivateKey } = await otherSvc.exportMasterKeys();
 
       await expect(
-        new OpenE2EE(userID, passphrase).load(otherPrivateKey, publicKey)
+        new E2EEKit(userID, passphrase).load(otherPrivateKey, publicKey)
       ).rejects.toThrow("pgp.decryptPrivateKey");
     });
 
@@ -80,7 +80,7 @@ const tests = (features: Feature[]) => {
       let { privateKey } = await etoeeSvc.exportMasterKeys();
 
       await expect(
-        new OpenE2EE(userID, passphrase, features).load(
+        new E2EEKit(userID, passphrase, features).load(
           privateKey,
           publicKeyBegin + "\ninvalid private key\n" + publicKeyEnd
         )
@@ -124,7 +124,7 @@ const tests = (features: Feature[]) => {
       const data = "data to encrypt";
 
       const { encryptedMessage } = await etoeeSvc.encrypt(data, false);
-      const receiverSvc = await new OpenE2EE(
+      const receiverSvc = await new E2EEKit(
         userID + "other",
         passphrase + "other",
         features
@@ -187,7 +187,7 @@ const tests = (features: Feature[]) => {
       test("share()", async () => {
         const data = "data to encrypt";
 
-        const receiverSvc = await new OpenE2EE(
+        const receiverSvc = await new E2EEKit(
           userID + "other",
           passphrase + "other",
           features
@@ -224,7 +224,7 @@ const tests = (features: Feature[]) => {
       test("shareNew()", async () => {
         const data = "data to encrypt";
 
-        const receiverSvc = await new OpenE2EE(
+        const receiverSvc = await new E2EEKit(
           userID + "other",
           passphrase + "other",
           features
@@ -261,7 +261,7 @@ const tests = (features: Feature[]) => {
       test("receive()", async () => {
         const data = "data to encrypt";
 
-        const receiverSvc = await new OpenE2EE(
+        const receiverSvc = await new E2EEKit(
           userID + "other",
           passphrase + "other",
           features
@@ -283,7 +283,7 @@ const tests = (features: Feature[]) => {
       test("receive(): error invalid sender public key", async () => {
         const data = "data to encrypt";
 
-        const receiverSvc = await new OpenE2EE(
+        const receiverSvc = await new E2EEKit(
           userID + "other",
           passphrase + "other",
           features
@@ -308,7 +308,7 @@ const tests = (features: Feature[]) => {
       test("receive(): error invalid receiver encrypted message", async () => {
         const data = "data to encrypt";
 
-        const receiverSvc = await new OpenE2EE(
+        const receiverSvc = await new E2EEKit(
           userID + "other",
           passphrase + "other",
           features
@@ -331,7 +331,7 @@ const tests = (features: Feature[]) => {
       test("share(): error no feature share", async () => {
         const data = "data to encrypt";
         const { encryptedMessage } = await etoeeSvc.encrypt(data);
-        const receiverSvc = await new OpenE2EE(
+        const receiverSvc = await new E2EEKit(
           userID + "other",
           passphrase + "other",
           features
@@ -346,7 +346,7 @@ const tests = (features: Feature[]) => {
 
       test("shareNew(): error no feature share", async () => {
         const data = "data to encrypt";
-        const receiverSvc = await new OpenE2EE(
+        const receiverSvc = await new E2EEKit(
           userID + "other",
           passphrase + "other",
           features
@@ -361,7 +361,7 @@ const tests = (features: Feature[]) => {
 
       test("receive(): error no feature share", async () => {
         const data = "data to encrypt";
-        const receiverSvc = await new OpenE2EE(
+        const receiverSvc = await new E2EEKit(
           userID + "other",
           passphrase + "other",
           features

@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useMemo, useEffect, ChangeEvent } from "react";
-import { OpenE2EE } from "../lib/open-e2ee";
+import { E2EEKit } from "../lib/e2ee-kit";
 
 const userID = "2997e638-b01b-446f-be33-df9ec8b4f206";
 
@@ -27,7 +27,7 @@ export default function Examples() {
 function TextExample() {
   const [passphrase, setPassphrase] = useState("passphrase-long-super-long");
   const etoeeSvc = useMemo(
-    () => new OpenE2EE(userID, passphrase, ["share"]),
+    () => new E2EEKit(userID, passphrase, ["share"]),
     []
   );
 
@@ -58,7 +58,7 @@ function TextExample() {
   };
 
   const onLoadPGPPrivateKey = async () => {
-    const svcLoaded = await new OpenE2EE(userID, passphrase, ["share"]).load(
+    const svcLoaded = await new E2EEKit(userID, passphrase, ["share"]).load(
       privateKey,
       publicKey
     );
@@ -70,7 +70,7 @@ function TextExample() {
   };
 
   const onShare = async () => {
-    const receiverSvc = await new OpenE2EE(userID + 1, passphrase + 1, [
+    const receiverSvc = await new E2EEKit(userID + 1, passphrase + 1, [
       "share",
     ]).build();
     const { publicKey: receiverPublicKey } =
